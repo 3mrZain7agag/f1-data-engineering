@@ -52,6 +52,59 @@ Every step produces a working, demonstrable system.
 
 ---
 
+## 🚀 Quick Start
+
+> **Everything runs on GitHub Codespaces — no local installation needed.**
+
+### First Time Only
+```bash
+bash scripts/setup.sh
+```
+
+### Every Time You Reopen Codespace
+```bash
+bash scripts/start.sh
+```
+
+### Save Your Work to GitHub
+```bash
+bash scripts/git_save.sh "your message here"
+```
+
+---
+
+## 📋 Scripts Reference
+
+All helper scripts live in the `scripts/` folder.
+No need to remember any commands — just run the right script.
+
+| Script | Usage | Purpose |
+|--------|-------|---------|
+| `setup.sh` | `bash scripts/setup.sh` | Run **once** after cloning — installs everything |
+| `start.sh` | `bash scripts/start.sh` | Run **every session** — starts PostgreSQL + Airflow |
+| `stop.sh` | `bash scripts/stop.sh` | Stop all services cleanly |
+| `step01.sh` | `bash scripts/step01.sh` | Pull F1 data from Jolpica API |
+| `step01.sh` | `bash scripts/step01.sh 2024` | Pull a single season only |
+| `step02.sh` | `bash scripts/step02.sh` | Load raw CSVs into PostgreSQL DWH |
+| `step03.sh` | `bash scripts/step03.sh` | Trigger Airflow DAGs |
+| `git_save.sh` | `bash scripts/git_save.sh "message"` | Commit and push to GitHub |
+
+### Daily Workflow
+```
+Morning:
+  bash scripts/start.sh          ← start everything
+
+Work on the project...
+
+Save progress:
+  bash scripts/git_save.sh "feat: what I did today"
+
+End of day:
+  bash scripts/stop.sh           ← stop everything cleanly
+```
+
+---
+
 ## ✅ Step 01 — Simple Python ETL
 
 ### What it does
@@ -71,15 +124,10 @@ as CSV files and an SQLite database.
 | Pit Stops | 14,261 |
 | Lap Times | 59,447 |
 
-### How to run
+### Run it
 ```bash
-pip install -r requirements.txt
-
-# Single season (test)
-python -m ingestion.extract_all --seasons 2024
-
-# Full run — all 10 seasons
-python -m ingestion.extract_all
+bash scripts/step01.sh             # all seasons 2015–2024
+bash scripts/step01.sh 2024        # single season (faster, for testing)
 ```
 
 ### Key features
@@ -120,16 +168,9 @@ dim_circuits ── fact_race_results ── dim_constructors
 | fact_pit_stops | Fact | 14,261 |
 | fact_qualifying | Fact | 7,931 |
 
-### How to run
+### Run it
 ```bash
-# Start PostgreSQL
-docker-compose -f docker/docker-compose.yml up -d
-
-# Create schema
-docker exec -i f1_postgres psql -U f1user -d f1_warehouse < warehouse/schema.sql
-
-# Load data
-python -m warehouse.load_warehouse
+bash scripts/step02.sh
 ```
 
 ### Example queries
@@ -171,7 +212,7 @@ automatically on a schedule, with retries, logging, and a Web UI for monitoring.
 ### DAG Design
 ```
 dag_ingest_f1 (Every Monday 02:00 UTC)
-├── ingest_current_season (2024)
+├── ingest_current_season   (2024 only)
 └── ingest_historical_seasons (2015–2023)
 
 dag_load_warehouse (Every Monday 05:00 UTC)
@@ -179,24 +220,13 @@ dag_load_warehouse (Every Monday 05:00 UTC)
 └── validate_row_counts
 ```
 
-### How to run
+### Run it
 ```bash
-# Set Airflow home
-export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
-
-# Initialize (first time only)
-airflow db migrate
-airflow users create --username admin --firstname Amr --lastname Hagag \
-    --role Admin --email amr.hagag.prof@gmail.com --password admin123
-
-# Terminal 1 — Web UI
-airflow webserver --port 8080
-
-# Terminal 2 — Scheduler
-airflow scheduler
+bash scripts/start.sh      # starts Airflow automatically
+bash scripts/step03.sh     # triggers the DAGs
 ```
 
-Then open port **8080** in Codespaces to access the Airflow Web UI.
+Then open **port 8080** in the Codespaces Ports tab → login with `admin / admin123`
 
 ### Key features
 - ✅ Two DAGs — ingestion and warehouse loading
@@ -208,7 +238,7 @@ Then open port **8080** in Codespaces to access the Airflow Web UI.
 
 ### Lessons learned
 - `ExternalTaskSensor` matches runs by exact timestamp — avoid for manually triggered DAGs
-- Airflow 2.9.3 requires SQLAlchemy 1.4 which conflicts with pandas 2.2 `to_sql` — solved by using psycopg2 directly
+- Airflow 2.9.3 requires SQLAlchemy 1.4 which conflicts with pandas 2.2 — solved by using psycopg2 directly
 - Always enable `enable_proxy_fix = True` when running Airflow behind a proxy (Codespaces)
 
 ---
@@ -218,22 +248,30 @@ Then open port **8080** in Codespaces to access the Airflow Web UI.
 ```
 f1-data-engineering/
 ├── ingestion/
-│   ├── ergast_client.py         ← Jolpica API client (retry, pagination)
-│   └── extract_all.py           ← Main ETL runner (8 extractors)
+│   ├── ergast_client.py          ← Jolpica API client (retry, pagination)
+│   └── extract_all.py            ← Main ETL runner (8 extractors)
 ├── warehouse/
-│   ├── schema.sql               ← Star Schema DDL (9 tables)
-│   └── load_warehouse.py        ← CSV → PostgreSQL loader (psycopg2)
+│   ├── schema.sql                ← Star Schema DDL (9 tables)
+│   └── load_warehouse.py         ← CSV → PostgreSQL loader (psycopg2)
 ├── orchestration/
 │   └── dags/
-│       ├── dag_ingest_f1.py     ← Ingestion DAG
-│       └── dag_load_warehouse.py← Warehouse load DAG
+│       ├── dag_ingest_f1.py      ← Ingestion DAG
+│       └── dag_load_warehouse.py ← Warehouse load DAG
+├── scripts/
+│   ├── setup.sh                  ← First-time setup
+│   ├── start.sh                  ← Start all services
+│   ├── stop.sh                   ← Stop all services
+│   ├── step01.sh                 ← Run Step 01
+│   ├── step02.sh                 ← Run Step 02
+│   ├── step03.sh                 ← Run Step 03
+│   └── git_save.sh               ← Save work to GitHub
 ├── utils/
-│   └── logger.py                ← Structured JSON logging
+│   └── logger.py                 ← Structured JSON logging
 ├── docker/
-│   └── docker-compose.yml       ← PostgreSQL container
+│   └── docker-compose.yml        ← PostgreSQL container
 ├── data/
-│   └── raw/                     ← gitignored — lives locally only
-├── airflow/                     ← gitignored — Airflow metadata
+│   └── raw/                      ← gitignored — lives locally only
+├── airflow/                      ← gitignored — Airflow metadata
 ├── requirements.txt
 └── README.md
 ```
@@ -255,16 +293,6 @@ f1-data-engineering/
 
 ---
 
-## 🚀 Development Environment
-
-This project runs entirely on **GitHub Codespaces** — no local installation needed.
-
-1. Click **Code** → **Codespaces** → Open existing Codespace
-2. All dependencies install via `pip install -r requirements.txt`
-3. Docker and Docker Compose are available out of the box
-
----
-
 ## 📝 Commit Convention
 
 | Prefix | Usage |
@@ -274,4 +302,4 @@ This project runs entirely on **GitHub Codespaces** — no local installation ne
 | `docs:` | Documentation update |
 | `refactor:` | Code improvement |
 | `test:` | Adding tests |
-| `chore:` | Setup or config |
+| `chore:` | Setup, scripts, config |
