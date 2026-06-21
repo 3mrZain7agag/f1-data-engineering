@@ -1,0 +1,67 @@
+#!/bin/bash
+# =============================================================
+# setup.sh — Run this ONCE after cloning the repo
+# Sets up the full project environment from scratch
+# Usage: bash scripts/setup.sh
+# =============================================================
+
+set -e  # Stop if any command fails
+
+echo ""
+echo "=================================================="
+echo "  F1 Data Engineering — Project Setup"
+echo "=================================================="
+echo ""
+
+# ── Step 1: Install Python dependencies ───────────────────
+echo "📦 Installing Python dependencies..."
+pip install -r requirements.txt -q
+echo "✅ Python dependencies installed"
+echo ""
+
+# ── Step 2: Initialize Airflow ─────────────────────────────
+echo "✈️  Initializing Apache Airflow..."
+export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
+airflow db migrate -q
+
+# Create admin user (ignore error if already exists)
+airflow users create \
+    --username admin \
+    --firstname Amr \
+    --lastname Hagag \
+    --role Admin \
+    --email amr.hagag.prof@gmail.com \
+    --password admin123 2>/dev/null || echo "   (admin user already exists)"
+
+# Configure Airflow settings
+sed -i "s|load_examples = True|load_examples = False|" airflow/airflow.cfg 2>/dev/null || true
+sed -i "s|dags_folder = .*|dags_folder = /workspaces/f1-data-engineering/orchestration/dags|" airflow/airflow.cfg 2>/dev/null || true
+sed -i "s|enable_proxy_fix = False|enable_proxy_fix = True|" airflow/airflow.cfg 2>/dev/null || true
+
+echo "✅ Airflow initialized"
+echo ""
+
+# ── Step 3: Start PostgreSQL ───────────────────────────────
+echo "🐳 Starting PostgreSQL..."
+docker-compose -f docker/docker-compose.yml up -d
+echo "✅ PostgreSQL started"
+echo ""
+
+# ── Step 4: Wait for PostgreSQL to be ready ────────────────
+echo "⏳ Waiting for PostgreSQL to be ready..."
+sleep 5
+
+# ── Step 5: Create database schema ────────────────────────
+echo "🏗️  Creating Star Schema tables..."
+docker exec -i f1_postgres psql -U f1user -d f1_warehouse < warehouse/schema.sql
+echo "✅ Schema created"
+echo ""
+
+echo "=================================================="
+echo "  ✅ Setup Complete!"
+echo ""
+echo "  Next steps:"
+echo "  → Run:  bash scripts/start.sh    (start all services)"
+echo "  → Then: bash scripts/step01.sh   (pull F1 data)"
+echo "=================================================="
+echo ""
