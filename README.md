@@ -9,6 +9,7 @@
 **Amr Hagag** — Data Engineering Student & DEPI Trainee
 - 📧 amr.hagag.prof@gmail.com
 - 💼 [linkedin.com/in/amrhagag-dataeng](https://linkedin.com/in/amrhagag-dataeng)
+- 🐙 [github.com/3mrZain7agag](https://github.com/3mrZain7agag)
 
 ---
 
@@ -38,7 +39,7 @@ Every step produces a working, demonstrable system.
 |------|-------|--------|-----------|
 | 01 | Simple Python ETL | ✅ Complete | Python, Pandas, SQLite |
 | 02 | Local Data Warehouse | ✅ Complete | PostgreSQL, Star Schema, Docker |
-| 03 | Airflow Orchestration | 🔲 Upcoming | Apache Airflow, Docker Compose |
+| 03 | Airflow Orchestration | ✅ Complete | Apache Airflow, DAGs, psycopg2 |
 | 04 | Bronze Data Lake | 🔲 Upcoming | MinIO, S3, Parquet |
 | 05 | PySpark Silver Layer | 🔲 Upcoming | Apache Spark, Iceberg |
 | 06 | dbt Gold Layer | 🔲 Upcoming | dbt-core, dbt-spark |
@@ -66,9 +67,9 @@ as CSV files and an SQLite database.
 | Constructors | 18 |
 | Circuits | 32 |
 | Race Results | 4,219 |
-| Qualifying | 4,205 |
-| Pit Stops | 7,543 |
-| Lap Times | 31,588 |
+| Qualifying | 7,931 |
+| Pit Stops | 14,261 |
+| Lap Times | 59,447 |
 
 ### How to run
 ```bash
@@ -79,20 +80,6 @@ python -m ingestion.extract_all --seasons 2024
 
 # Full run — all 10 seasons
 python -m ingestion.extract_all
-```
-
-### Output
-```
-data/raw/
-├── races.csv
-├── drivers.csv
-├── constructors.csv
-├── circuits.csv
-├── results.csv
-├── qualifying.csv
-├── pit_stops.csv
-├── lap_times.csv
-└── f1.db          ← SQLite database
 ```
 
 ### Key features
@@ -107,8 +94,7 @@ data/raw/
 
 ### What it does
 Reads the raw CSVs from Step 01 and loads them into a PostgreSQL
-Data Warehouse modeled as a **Star Schema** — the foundation of all
-analytical databases.
+Data Warehouse modeled as a **Star Schema**.
 
 ### Star Schema Design
 ```
@@ -130,9 +116,9 @@ dim_circuits ── fact_race_results ── dim_constructors
 | dim_races | Dimension | 209 |
 | dim_dates | Dimension | 209 |
 | fact_race_results | Fact | 4,219 |
-| fact_lap_times | Fact | 31,588 |
-| fact_pit_stops | Fact | 7,543 |
-| fact_qualifying | Fact | 4,205 |
+| fact_lap_times | Fact | 59,447 |
+| fact_pit_stops | Fact | 14,261 |
+| fact_qualifying | Fact | 7,931 |
 
 ### How to run
 ```bash
@@ -156,7 +142,7 @@ GROUP BY d.full_name
 ORDER BY total_points DESC
 LIMIT 10;
 
--- Most dominant season
+-- Most wins per season
 SELECT r.season, d.full_name, COUNT(*) AS wins
 FROM fact_race_results f
 JOIN dim_drivers d ON f.driver_key = d.driver_key
@@ -176,22 +162,78 @@ LIMIT 10;
 
 ---
 
+## ✅ Step 03 — Apache Airflow Orchestration
+
+### What it does
+Wraps the manual pipeline scripts into Apache Airflow DAGs that run
+automatically on a schedule, with retries, logging, and a Web UI for monitoring.
+
+### DAG Design
+```
+dag_ingest_f1 (Every Monday 02:00 UTC)
+├── ingest_current_season (2024)
+└── ingest_historical_seasons (2015–2023)
+
+dag_load_warehouse (Every Monday 05:00 UTC)
+├── load_warehouse
+└── validate_row_counts
+```
+
+### How to run
+```bash
+# Set Airflow home
+export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
+
+# Initialize (first time only)
+airflow db migrate
+airflow users create --username admin --firstname Amr --lastname Hagag \
+    --role Admin --email amr.hagag.prof@gmail.com --password admin123
+
+# Terminal 1 — Web UI
+airflow webserver --port 8080
+
+# Terminal 2 — Scheduler
+airflow scheduler
+```
+
+Then open port **8080** in Codespaces to access the Airflow Web UI.
+
+### Key features
+- ✅ Two DAGs — ingestion and warehouse loading
+- ✅ Task dependency management (`>>` operator)
+- ✅ Automatic retries on failure (3 retries, 5 min delay)
+- ✅ Full run history and task logs in Web UI
+- ✅ Configurable schedules (cron expressions)
+- ✅ psycopg2 direct connection (bypasses SQLAlchemy version conflict)
+
+### Lessons learned
+- `ExternalTaskSensor` matches runs by exact timestamp — avoid for manually triggered DAGs
+- Airflow 2.9.3 requires SQLAlchemy 1.4 which conflicts with pandas 2.2 `to_sql` — solved by using psycopg2 directly
+- Always enable `enable_proxy_fix = True` when running Airflow behind a proxy (Codespaces)
+
+---
+
 ## 🗂️ Project Structure
 
 ```
 f1-data-engineering/
 ├── ingestion/
-│   ├── ergast_client.py     ← Jolpica API client
-│   └── extract_all.py       ← Main ETL runner
+│   ├── ergast_client.py         ← Jolpica API client (retry, pagination)
+│   └── extract_all.py           ← Main ETL runner (8 extractors)
 ├── warehouse/
-│   ├── schema.sql           ← Star Schema DDL
-│   └── load_warehouse.py    ← CSV → PostgreSQL loader
+│   ├── schema.sql               ← Star Schema DDL (9 tables)
+│   └── load_warehouse.py        ← CSV → PostgreSQL loader (psycopg2)
+├── orchestration/
+│   └── dags/
+│       ├── dag_ingest_f1.py     ← Ingestion DAG
+│       └── dag_load_warehouse.py← Warehouse load DAG
 ├── utils/
-│   └── logger.py            ← Structured JSON logging
+│   └── logger.py                ← Structured JSON logging
 ├── docker/
-│   └── docker-compose.yml   ← PostgreSQL container
+│   └── docker-compose.yml       ← PostgreSQL container
 ├── data/
-│   └── raw/                 ← gitignored — lives locally only
+│   └── raw/                     ← gitignored — lives locally only
+├── airflow/                     ← gitignored — Airflow metadata
 ├── requirements.txt
 └── README.md
 ```
@@ -200,15 +242,16 @@ f1-data-engineering/
 
 ## 🛠️ Tech Stack (Current)
 
-| Tool | Purpose |
-|------|---------|
-| Python 3.11+ | Pipeline code |
-| Pandas | Data manipulation |
-| Requests + Tenacity | API calls with retry |
-| PostgreSQL 15 | Data Warehouse |
-| Docker Compose | Local service management |
-| SQLAlchemy + psycopg2 | Python → PostgreSQL connector |
-| SQLite | Quick local storage (Step 01) |
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Python | 3.12 | Pipeline code |
+| Pandas | 2.2.2 | Data manipulation |
+| Requests + Tenacity | Latest | API calls with retry |
+| psycopg2 | Latest | PostgreSQL connector |
+| PostgreSQL | 15 | Data Warehouse |
+| Apache Airflow | 2.9.3 | Pipeline orchestration |
+| Docker Compose | 2.40 | Local service management |
+| SQLite | Built-in | Quick local storage (Step 01) |
 
 ---
 
@@ -218,7 +261,7 @@ This project runs entirely on **GitHub Codespaces** — no local installation ne
 
 1. Click **Code** → **Codespaces** → Open existing Codespace
 2. All dependencies install via `pip install -r requirements.txt`
-3. Docker is available out of the box in Codespaces
+3. Docker and Docker Compose are available out of the box
 
 ---
 
