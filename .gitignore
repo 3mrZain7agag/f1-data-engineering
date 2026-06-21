@@ -227,3 +227,10 @@ data/raw/
 *.env
 __pycache__/
 .pytest_cache/
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+airflow/*.cfg
+airflow/*.pid
+airflow/webserver_config.py
