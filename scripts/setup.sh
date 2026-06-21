@@ -19,12 +19,21 @@ pip install -r requirements.txt -q
 echo "✅ Python dependencies installed"
 echo ""
 
-# ── Step 2: Initialize Airflow ─────────────────────────────
-echo "✈️  Initializing Apache Airflow..."
+# ── Step 2: Install Apache Airflow ────────────────────────
+echo "✈️  Installing Apache Airflow..."
+pip install apache-airflow==2.9.3 -q \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-3.12.txt"
+echo "✅ Airflow installed"
+echo ""
+
+# ── Step 3: Initialize Airflow ─────────────────────────────
+echo "⚙️  Initializing Airflow..."
 export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
+export PATH=$PATH:$HOME/.local/bin
+
 airflow db migrate -q
 
-# Create admin user (ignore error if already exists)
+# Create admin user
 airflow users create \
     --username admin \
     --firstname Amr \
@@ -41,17 +50,17 @@ sed -i "s|enable_proxy_fix = False|enable_proxy_fix = True|" airflow/airflow.cfg
 echo "✅ Airflow initialized"
 echo ""
 
-# ── Step 3: Start PostgreSQL ───────────────────────────────
+# ── Step 4: Start PostgreSQL ───────────────────────────────
 echo "🐳 Starting PostgreSQL..."
 docker-compose -f docker/docker-compose.yml up -d
 echo "✅ PostgreSQL started"
 echo ""
 
-# ── Step 4: Wait for PostgreSQL to be ready ────────────────
+# ── Step 5: Wait for PostgreSQL ────────────────────────────
 echo "⏳ Waiting for PostgreSQL to be ready..."
 sleep 5
 
-# ── Step 5: Create database schema ────────────────────────
+# ── Step 6: Create database schema ────────────────────────
 echo "🏗️  Creating Star Schema tables..."
 docker exec -i f1_postgres psql -U f1user -d f1_warehouse < warehouse/schema.sql
 echo "✅ Schema created"
@@ -61,7 +70,7 @@ echo "=================================================="
 echo "  ✅ Setup Complete!"
 echo ""
 echo "  Next steps:"
-echo "  → Run:  bash scripts/start.sh    (start all services)"
-echo "  → Then: bash scripts/step01.sh   (pull F1 data)"
+echo "  → Run: bash scripts/start.sh    (start all services)"
+echo "  → Then: bash scripts/step01.sh  (pull F1 data)"
 echo "=================================================="
 echo ""

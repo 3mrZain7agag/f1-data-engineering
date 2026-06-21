@@ -28,6 +28,7 @@ docker exec f1_postgres pg_isready -U f1user -d f1_warehouse > /dev/null 2>&1 \
 echo ""
 
 # ── Set Airflow home ───────────────────────────────────────
+export PATH=$PATH:$HOME/.local/bin
 export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
 
 # ── Start Airflow Webserver ────────────────────────────────
