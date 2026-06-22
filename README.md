@@ -66,11 +66,21 @@ bash scripts/setup.sh
 bash scripts/start.sh
 ```
 
+### Run the Full Pipeline
+```bash
+bash scripts/step03.sh   # Airflow handles Step 01 + Step 02 automatically
+```
+
+### Manual Run (debugging only)
+```bash
+bash scripts/step01.sh   # pull data manually
+bash scripts/step02.sh   # load warehouse manually
+```
+
 ### Save Your Work to GitHub
 ```bash
 bash scripts/git_save.sh "your message here"
 ```
-
 ---
 
 ## 📋 Scripts Reference
