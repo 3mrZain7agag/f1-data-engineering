@@ -48,9 +48,7 @@ class ErgastClient:
         log.info(f"GET {url}  params={params}")
         resp = self.session.get(url, params=params, timeout=30)
         if resp.status_code == 429:
-            import time
             time.sleep(60)  # wait 60 seconds on rate limit
-            resp.raise_for_status()
         resp.raise_for_status()
         return resp.json()
 
