@@ -74,3 +74,16 @@ echo "  → Run: bash scripts/start.sh    (start all services)"
 echo "  → Then: bash scripts/step01.sh  (pull F1 data)"
 echo "=================================================="
 echo ""
+
+# ── Fix: Enable Airflow REST API for VS Code extension ─────
+echo "🔌 Enabling Airflow REST API..."
+python3 -c "
+content = open('airflow/airflow.cfg').read()
+content = content.replace(
+    'auth_backends = airflow.api.auth.backend.session',
+    'auth_backends = airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+)
+open('airflow/airflow.cfg', 'w').write(content)
+print('Done')
+"
+echo "✅ REST API enabled"
