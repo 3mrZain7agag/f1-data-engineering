@@ -31,7 +31,7 @@ echo "⚙️  Initializing Airflow..."
 export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
 export PATH=$PATH:$HOME/.local/bin
 
-airflow db migrate -q
+airflow db migrate
 
 # Create admin user
 airflow users create \
