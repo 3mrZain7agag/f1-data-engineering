@@ -24,7 +24,7 @@ log = get_logger(__name__)
 
 BASE_URL = "https://api.jolpi.ca/ergast/f1"
 DEFAULT_LIMIT = 1000          # max rows per page
-REQUEST_DELAY = 0.25          # seconds between requests (~4 req/s)
+REQUEST_DELAY = 1.0           # seconds between requests (~1 req/s)
 
 
 class ErgastClient:
@@ -38,8 +38,8 @@ class ErgastClient:
 
     # ── Core fetcher ───────────────────────────────────────────────────────
     @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=2, min=2, max=30),
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=3, min=5, max=120),
         retry=retry_if_exception_type(requests.RequestException),
         reraise=True,
     )
@@ -47,6 +47,10 @@ class ErgastClient:
         time.sleep(self.delay)
         log.info(f"GET {url}  params={params}")
         resp = self.session.get(url, params=params, timeout=30)
+        if resp.status_code == 429:
+            import time
+            time.sleep(60)  # wait 60 seconds on rate limit
+            resp.raise_for_status()
         resp.raise_for_status()
         return resp.json()
 
