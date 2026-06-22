@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================
 # start.sh — Run this EVERY TIME you reopen the Codespace
-# Starts all services: PostgreSQL, Airflow Webserver, Scheduler
+# Starts all services: PostgreSQL, MinIO, Airflow
 # Usage: bash scripts/start.sh
 # =============================================================
 
@@ -11,24 +11,29 @@ echo "  F1 Data Engineering — Starting All Services"
 echo "=================================================="
 echo ""
 
-# ── Start PostgreSQL ───────────────────────────────────────
-echo "🐳 Starting PostgreSQL..."
+# ── Pull latest code from GitHub ──────────────────────────
+echo "⬇️  Pulling latest changes from GitHub..."
+git pull origin main
+echo "✅ Code is up to date"
+echo ""
+
+# ── Set Airflow environment ────────────────────────────────
+export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
+export PATH=$PATH:$HOME/.local/bin
+
+# ── Start PostgreSQL + MinIO ───────────────────────────────
+echo "🐳 Starting PostgreSQL + MinIO..."
 docker-compose -f docker/docker-compose.yml up -d
-echo "✅ PostgreSQL running"
+echo "✅ PostgreSQL + MinIO running"
 echo ""
 
 # ── Wait for PostgreSQL ────────────────────────────────────
 echo "⏳ Waiting for PostgreSQL to be ready..."
 sleep 4
-
-# ── Verify PostgreSQL ──────────────────────────────────────
 docker exec f1_postgres pg_isready -U f1user -d f1_warehouse > /dev/null 2>&1 \
     && echo "✅ PostgreSQL is accepting connections" \
     || echo "⚠️  PostgreSQL not ready yet — wait a few seconds and retry"
 echo ""
-
-# ── Set Airflow home ───────────────────────────────────────
-export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
 
 # ── Start Airflow Webserver ────────────────────────────────
 echo "🌐 Starting Airflow Webserver on port 8080..."
@@ -55,10 +60,13 @@ echo ""
 echo "  🌐 Airflow UI  → Open port 8080 in Ports tab"
 echo "  🔑 Login       → admin / admin123"
 echo "  🐳 PostgreSQL  → localhost:5432"
+echo "  🪣 MinIO UI    → Open port 9001 in Ports tab"
+echo "  🔑 MinIO Login → f1minio / f1minio123"
 echo ""
 echo "  📋 Available scripts:"
 echo "  → bash scripts/step01.sh   Pull F1 data from API"
 echo "  → bash scripts/step02.sh   Load data into warehouse"
+echo "  → bash scripts/step04.sh   Upload to Bronze layer"
 echo "  → bash scripts/stop.sh     Stop all services"
 echo "=================================================="
 echo ""
