@@ -36,7 +36,7 @@ BRONZE_PATHS = {
 }
 
 
-def ingest_to_bronze() -> None:
+def ingest_to_bronze(force: bool = False) -> None:
     """Upload all raw CSVs to MinIO Bronze layer."""
 
     # ── Connect to MinIO ───────────────────────────────────
@@ -56,8 +56,8 @@ def ingest_to_bronze() -> None:
             skipped += 1
             continue
 
-        # Incremental — skip if already uploaded
-        if object_exists(client, BRONZE_BUCKET, s3_key):
+        # Incremental — skip if already uploaded (use --force to override)
+        if not force and object_exists(client, BRONZE_BUCKET, s3_key):
             log.info(f"Already exists — skipping: s3://{BRONZE_BUCKET}/{s3_key}")
             skipped += 1
             continue
