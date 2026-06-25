@@ -3,7 +3,7 @@
 # step01.sh — Pull F1 historical data from Jolpica API
 # Saves raw data to data/raw/ as CSV files + SQLite DB
 # Usage:
-#   bash scripts/step01.sh              # all seasons 2015-2024
+#   bash scripts/step01.sh              # all seasons 2015-2025
 #   bash scripts/step01.sh 2024         # single season
 #   bash scripts/step01.sh 2022 2023    # multiple seasons
 # =============================================================
@@ -20,14 +20,34 @@ mkdir -p data/raw
 
 # ── Run ingestion ──────────────────────────────────────────
 if [ $# -eq 0 ]; then
-    echo "📡 Fetching all seasons (2015–2024)..."
-    echo "   ⚠️  This will take ~45-60 minutes due to API rate limiting"
+    echo "📡 Fetching all seasons one by one (2015–2025)..."
+    echo "   ⚠️  Running one season at a time with 2min breaks"
+    echo "   ⚠️  Total time: ~3-4 hours"
     echo ""
-    python -m ingestion.extract_all
+    for season in 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024 2025; do
+        echo "──────────────────────────────────────────"
+        echo "📡 Fetching season $season..."
+        python -m ingestion.extract_all --seasons $season
+        if [ $season -ne 2025 ]; then
+            echo "⏳ Waiting 2 minutes before next season..."
+            sleep 120
+        fi
+    done
+elif [ $# -eq 1 ]; then
+    echo "📡 Fetching season: $1"
+    echo ""
+    python -m ingestion.extract_all --seasons "$1"
 else
-    echo "📡 Fetching season(s): $@"
+    echo "📡 Fetching seasons: $@"
+    echo "   ⚠️  Running one season at a time with 2min breaks"
     echo ""
-    python -m ingestion.extract_all --seasons "$@"
+    for season in "$@"; do
+        echo "──────────────────────────────────────────"
+        echo "📡 Fetching season $season..."
+        python -m ingestion.extract_all --seasons $season
+        echo "⏳ Waiting 2 minutes before next season..."
+        sleep 120
+    done
 fi
 
 echo ""
