@@ -63,17 +63,15 @@ bash scripts/setup.sh
 bash scripts/start.sh
 ```
 
+### Check What's Running
+```bash
+bash scripts/status.sh
+```
+
 ### Run the Full Pipeline
 ```bash
 bash scripts/step03.sh   # Airflow handles Step 01 + Step 02 automatically
 bash scripts/step04.sh   # Upload to Bronze layer
-```
-
-### Manual Run (debugging only)
-```bash
-bash scripts/step01.sh   # pull data manually
-bash scripts/step02.sh   # load warehouse manually
-bash scripts/step04.sh   # upload to Bronze
 ```
 
 ### Save Your Work to GitHub
@@ -85,22 +83,45 @@ bash scripts/git_save.sh "your message here"
 
 ## 📋 Scripts Reference
 
+All helper scripts live in the `scripts/` folder.
+No need to remember any commands — just run the right script.
+
+### 🔧 Setup & Lifecycle
+
 | Script | Usage | Purpose |
 |--------|-------|---------|
 | `setup.sh` | `bash scripts/setup.sh` | Run **once** after cloning — installs everything |
-| `start.sh` | `bash scripts/start.sh` | Run **every session** — starts all services |
-| `stop.sh` | `bash scripts/stop.sh` | Stop all services cleanly |
-| `step01.sh` | `bash scripts/step01.sh` | Pull F1 data from Jolpica API |
-| `step01.sh` | `bash scripts/step01.sh 2024` | Pull a single season only |
-| `step02.sh` | `bash scripts/step02.sh` | Load raw CSVs into PostgreSQL DWH |
-| `step03.sh` | `bash scripts/step03.sh` | Trigger Airflow DAGs |
-| `step04.sh` | `bash scripts/step04.sh` | Upload raw CSVs to Bronze layer (MinIO) |
+| `start.sh` | `bash scripts/start.sh` | Start **all** services + git pull |
+| `stop.sh` | `bash scripts/stop.sh` | Stop **all** services cleanly |
+| `status.sh` | `bash scripts/status.sh` | Check status of all services + data summary |
 | `git_save.sh` | `bash scripts/git_save.sh "message"` | Commit and push to GitHub |
 
-### Daily Workflow
+### 🐳 Individual Service Control
+
+| Script | Usage | Purpose |
+|--------|-------|---------|
+| `start_postgres.sh` | `bash scripts/start_postgres.sh` | Start PostgreSQL only |
+| `start_minio.sh` | `bash scripts/start_minio.sh` | Start MinIO only |
+| `start_airflow.sh` | `bash scripts/start_airflow.sh` | Start Airflow webserver + scheduler |
+| `stop_postgres.sh` | `bash scripts/stop_postgres.sh` | Stop PostgreSQL only |
+| `stop_minio.sh` | `bash scripts/stop_minio.sh` | Stop MinIO only |
+| `stop_airflow.sh` | `bash scripts/stop_airflow.sh` | Stop Airflow only |
+
+### 📊 Pipeline Steps
+
+| Script | Usage | Purpose |
+|--------|-------|---------|
+| `step01.sh` | `bash scripts/step01.sh` | Pull all F1 seasons from API |
+| `step01.sh` | `bash scripts/step01.sh 2024` | Pull a single season |
+| `step02.sh` | `bash scripts/step02.sh` | Load CSVs into PostgreSQL DWH |
+| `step03.sh` | `bash scripts/step03.sh` | Trigger + unpause Airflow DAGs |
+| `step04.sh` | `bash scripts/step04.sh` | Upload raw CSVs to Bronze (MinIO) |
+
+### 📅 Daily Workflow
 ```
 Morning:
   bash scripts/start.sh          ← starts everything + pulls latest code
+  bash scripts/status.sh         ← verify everything is running
 
 Work on the project...
 
@@ -109,6 +130,24 @@ Save progress:
 
 End of day:
   bash scripts/stop.sh           ← stop everything cleanly
+```
+
+### 🔧 Troubleshooting
+```bash
+# Airflow crashed? Restart only Airflow
+bash scripts/stop_airflow.sh
+bash scripts/start_airflow.sh
+
+# Only need to query the DB? Start PostgreSQL only
+bash scripts/start_postgres.sh
+
+# Data changed and need to re-upload to Bronze
+python3 -c "from datalake.bronze.ingest_to_bronze import ingest_to_bronze; ingest_to_bronze(force=True)"
+
+# Rate limit hit on lap times? Run seasons one by one
+bash scripts/step01.sh 2024
+sleep 120
+bash scripts/step01.sh 2025
 ```
 
 ---
@@ -133,8 +172,8 @@ Pulls F1 historical data (2015–2025) from the [Jolpica API](https://api.jolpi.
 
 ### Run it
 ```bash
-bash scripts/step01.sh             # all seasons
-bash scripts/step01.sh 2024        # single season (faster, for testing)
+bash scripts/step01.sh             # all seasons (runs one by one with 2min breaks)
+bash scripts/step01.sh 2024        # single season
 ```
 
 ### Key features
@@ -142,11 +181,12 @@ bash scripts/step01.sh 2024        # single season (faster, for testing)
 - ✅ Pagination support (handles large datasets)
 - ✅ Incremental loading (skips already downloaded data)
 - ✅ Structured JSON logging throughout
-- ✅ Rate limit handling — 429 errors trigger 60s wait + retry
+- ✅ 429 rate limit handling — 60s wait + retry
+- ✅ One season at a time with 2min sleep to avoid rate limits
 
 ### Known limitation
 Jolpica API returns incomplete lap time data (~35K rows vs expected ~800K).
-This will be resolved in Step 09 with FastF1 telemetry integration.
+Will be resolved in Step 09 with FastF1 telemetry integration.
 
 ---
 
@@ -212,7 +252,7 @@ LIMIT 10;
 - ✅ Foreign key relationships enforced
 - ✅ Deduplication before loading
 - ✅ Idempotent loader (safe to re-run)
-- ✅ Graceful handling of missing files (lap_times.csv)
+- ✅ Graceful handling of missing files
 
 ---
 
@@ -225,8 +265,8 @@ automatically on a schedule, with retries, logging, and a Web UI for monitoring.
 ### DAG Design
 ```
 dag_ingest_f1 (Every Monday 02:00 UTC)
-├── ingest_current_season   (latest season)
-└── ingest_historical_seasons (all previous seasons)
+├── ingest_current_season
+└── ingest_historical_seasons
 
 dag_load_warehouse (Every Monday 05:00 UTC)
 ├── load_warehouse
@@ -239,43 +279,27 @@ dag_ingest_to_bronze (Every Monday 03:00 UTC)
 ### Run it
 ```bash
 bash scripts/start.sh      # starts Airflow automatically
-bash scripts/step03.sh     # triggers the DAGs + unpauses them
+bash scripts/step03.sh     # triggers + unpauses all DAGs
 ```
 
-Then open **port 8080** in the Codespaces Ports tab → login with `admin / admin123`
+Open **port 8080** → login with `admin / admin123`
 
 ### Key features
 - ✅ Three DAGs — ingestion, warehouse loading, Bronze upload
 - ✅ Auto-unpause DAGs on trigger
-- ✅ Task dependency management (`>>` operator)
 - ✅ Automatic retries on failure
 - ✅ Full run history and task logs in Web UI
 - ✅ REST API enabled for VS Code Airflow extension
-
-### Lessons learned
-- `ExternalTaskSensor` matches runs by exact timestamp — removed in favor of manual trigger order
-- Airflow 2.9.3 requires SQLAlchemy 1.4 — solved by using psycopg2 directly
-- Always enable `enable_proxy_fix = True` when running behind a proxy (Codespaces)
-- DAGs start paused by default — always unpause before triggering
+- ✅ Compatible with VS Code PostgreSQL extension (Microsoft)
 
 ---
 
 ## ✅ Step 04 — Bronze Data Lake (MinIO)
 
 ### What it does
-Introduces a proper **Data Lake** by adding MinIO (S3-compatible object storage)
-to the stack. Raw CSV files are uploaded to a structured Bronze layer in MinIO,
-mirroring exactly what will run on AWS S3 in Step 10.
-
-### What is MinIO?
-MinIO is an open-source object storage system with a 100% compatible AWS S3 API.
-It runs locally in Docker and stores data on the Codespace disk.
-When we migrate to AWS in Step 10, only the endpoint URL changes — zero code changes.
-
-```
-Development:   MinIO (Docker)  →  localhost:9000
-Production:    AWS S3          →  s3://f1-datalake-prod/
-```
+Introduces a proper **Data Lake** by adding MinIO (S3-compatible object storage).
+Raw CSV files are uploaded to a structured Bronze layer, mirroring what will
+run on AWS S3 in Step 10.
 
 ### Bronze Layer Structure
 ```
@@ -296,32 +320,15 @@ s3://f1-bronze/
 bash scripts/step04.sh          # incremental — skips existing files
 ```
 
-### Force re-upload (when data changes)
-```bash
-python3 -c "
-from datalake.bronze.ingest_to_bronze import ingest_to_bronze
-ingest_to_bronze(force=True)
-"
-```
-
 ### MinIO UI
-Open **port 9001** in Codespaces Ports tab
-- **Username:** `f1minio`
-- **Password:** `f1minio123`
+Open **port 9001** → login with `f1minio / f1minio123`
 
 ### Key features
-- ✅ MinIO running in Docker alongside PostgreSQL
-- ✅ Identical boto3 API to AWS S3 — zero code changes needed for cloud migration
-- ✅ Structured folder hierarchy (source/entity/file)
-- ✅ Incremental uploads (skips already uploaded files)
+- ✅ MinIO running in Docker — identical API to AWS S3
+- ✅ Incremental uploads (skips existing files)
 - ✅ Force re-upload flag for data updates
-- ✅ `storage_client.py` abstraction — switches between MinIO and S3 via env var
+- ✅ `storage_client.py` — switches between MinIO and AWS S3 via single env var
 - ✅ dag_ingest_to_bronze DAG in Airflow
-
-### Lessons learned
-- MinIO is S3 under the hood — same boto3 client, same API calls, same bucket structure
-- Incremental checks need a force flag when source data is updated
-- Bronze = raw unmodified data — no transformations, full audit trail
 
 ---
 
@@ -330,36 +337,42 @@ Open **port 9001** in Codespaces Ports tab
 ```
 f1-data-engineering/
 ├── ingestion/
-│   ├── ergast_client.py          ← Jolpica API client (retry, pagination, 429 handling)
-│   └── extract_all.py            ← Main ETL runner (8 extractors)
+│   ├── ergast_client.py          ← Jolpica API client
+│   └── extract_all.py            ← Main ETL runner
 ├── warehouse/
-│   ├── schema.sql                ← Star Schema DDL (9 tables)
-│   └── load_warehouse.py         ← CSV → PostgreSQL loader (psycopg2)
+│   ├── schema.sql                ← Star Schema DDL
+│   └── load_warehouse.py         ← CSV → PostgreSQL loader
 ├── datalake/
-│   ├── storage_client.py         ← Unified S3/MinIO client (env-based switching)
+│   ├── storage_client.py         ← Unified S3/MinIO client
 │   └── bronze/
 │       └── ingest_to_bronze.py   ← Upload CSVs to Bronze layer
 ├── orchestration/
 │   └── dags/
-│       ├── dag_ingest_f1.py      ← Ingestion DAG
-│       ├── dag_load_warehouse.py ← Warehouse load DAG
-│       └── dag_ingest_to_bronze.py ← Bronze upload DAG
+│       ├── dag_ingest_f1.py
+│       ├── dag_load_warehouse.py
+│       └── dag_ingest_to_bronze.py
 ├── scripts/
-│   ├── setup.sh                  ← First-time setup (installs everything)
-│   ├── start.sh                  ← Start all services + git pull
+│   ├── setup.sh                  ← First-time setup
+│   ├── start.sh                  ← Start all services
 │   ├── stop.sh                   ← Stop all services
-│   ├── step01.sh                 ← Pull F1 data from API
-│   ├── step02.sh                 ← Load data into PostgreSQL DWH
+│   ├── status.sh                 ← Check all services + data summary
+│   ├── start_postgres.sh         ← Start PostgreSQL only
+│   ├── start_minio.sh            ← Start MinIO only
+│   ├── start_airflow.sh          ← Start Airflow only
+│   ├── stop_postgres.sh          ← Stop PostgreSQL only
+│   ├── stop_minio.sh             ← Stop MinIO only
+│   ├── stop_airflow.sh           ← Stop Airflow only
+│   ├── step01.sh                 ← Pull F1 data
+│   ├── step02.sh                 ← Load warehouse
 │   ├── step03.sh                 ← Trigger Airflow DAGs
-│   ├── step04.sh                 ← Upload to Bronze layer (MinIO)
-│   └── git_save.sh               ← Commit and push to GitHub
+│   ├── step04.sh                 ← Upload to Bronze
+│   └── git_save.sh               ← Save to GitHub
 ├── utils/
-│   └── logger.py                 ← Structured JSON logging
+│   └── logger.py
 ├── docker/
-│   └── docker-compose.yml        ← PostgreSQL + MinIO containers
-├── data/
-│   └── raw/                      ← gitignored — lives locally only
-├── airflow/                      ← gitignored — Airflow metadata
+│   └── docker-compose.yml        ← PostgreSQL + MinIO
+├── data/raw/                     ← gitignored
+├── airflow/                      ← gitignored
 ├── requirements.txt
 └── README.md
 ```
@@ -376,10 +389,21 @@ f1-data-engineering/
 | psycopg2 | 2.9.9 | PostgreSQL connector |
 | boto3 | 1.34.144 | S3/MinIO client |
 | PostgreSQL | 15 | Data Warehouse |
-| MinIO | Latest | Local S3-compatible object storage |
+| MinIO | Latest | Local S3-compatible storage |
 | Apache Airflow | 2.9.3 | Pipeline orchestration |
 | Docker Compose | 2.40 | Local service management |
 | SQLite | Built-in | Quick local storage (Step 01) |
+
+---
+
+## 🖥️ Service Ports
+
+| Service | Port | URL |
+|---------|------|-----|
+| PostgreSQL | 5432 | localhost:5432 |
+| MinIO API | 9000 | localhost:9000 |
+| MinIO UI | 9001 | Open in Codespaces Ports tab |
+| Airflow UI | 8080 | Open in Codespaces Ports tab |
 
 ---
 
