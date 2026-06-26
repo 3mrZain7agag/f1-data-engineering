@@ -19,6 +19,14 @@ pip install -r requirements.txt -q
 echo "✅ Python dependencies installed"
 echo ""
 
+# ── Step 1.5: Install Java 17 (required for Spark) ──────────
+echo "☕ Installing Java 17..."
+sudo apt-get update -q && sudo apt-get install -y openjdk-17-jdk -q
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+echo "✅ Java 17 installed"
+echo ""
+
 # ── Step 2: Install Apache Airflow ────────────────────────
 echo "✈️  Installing Apache Airflow..."
 pip install apache-airflow==2.9.3 -q \

@@ -1,3 +1,6 @@
+# Note: Airflow runs directly on Codespace (pip installed)
+# See scripts/start_airflow.sh to start it
+
 services:
   postgres:
     image: postgres:15
@@ -24,6 +27,28 @@ services:
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+  spark-master:
+    image: apache/spark:3.5.0
+    container_name: f1_spark_master
+    entrypoint: /opt/spark/bin/spark-class
+    command: org.apache.spark.deploy.master.Master
+    ports:
+      - "7077:7077"
+      - "8082:8080"
+    restart: unless-stopped
+
+  spark-worker:
+    image: apache/spark:3.5.0
+    container_name: f1_spark_worker
+    entrypoint: /opt/spark/bin/spark-class
+    command: org.apache.spark.deploy.worker.Worker spark://f1_spark_master:7077
+    environment:
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
     restart: unless-stopped
 
 volumes:

@@ -18,6 +18,8 @@ echo "✅ Code is up to date"
 echo ""
 
 # ── Set Airflow environment ────────────────────────────────
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
 export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
 export PATH=$PATH:$HOME/.local/bin
 
