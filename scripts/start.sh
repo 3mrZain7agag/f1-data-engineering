@@ -24,9 +24,9 @@ export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
 export PATH=$PATH:$HOME/.local/bin
 
 # ── Start PostgreSQL + MinIO ───────────────────────────────
-echo "🐳 Starting PostgreSQL + MinIO..."
+echo "🐳 Starting PostgreSQL + MinIO + Spark..."
 docker-compose -f docker/docker-compose.yml up -d
-echo "✅ PostgreSQL + MinIO running"
+echo "✅ PostgreSQL + MinIO + Spark running"
 echo ""
 
 # ── Wait for PostgreSQL ────────────────────────────────────
