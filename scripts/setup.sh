@@ -58,6 +58,48 @@ sed -i "s|enable_proxy_fix = False|enable_proxy_fix = True|" airflow/airflow.cfg
 echo "✅ Airflow initialized"
 echo ""
 
+# ── Step 3.5: Create MinIO buckets ────────────────────────
+echo "🪣 Creating MinIO buckets..."
+docker-compose -f docker/docker-compose.yml up -d minio
+sleep 4
+python3 -c "
+import boto3
+from botocore.client import Config
+c = boto3.client('s3', endpoint_url='http://localhost:9000',
+    aws_access_key_id='f1minio', aws_secret_access_key='f1minio123',
+    config=Config(signature_version='s3v4'), region_name='us-east-1')
+for bucket in ['f1-bronze', 'f1-silver', 'f1-gold']:
+    try:
+        c.head_bucket(Bucket=bucket)
+        print(f'  {bucket} already exists')
+    except:
+        c.create_bucket(Bucket=bucket)
+        print(f'  {bucket} created')
+"
+echo "✅ MinIO buckets ready"
+echo ""
+
+# ── Step 3.5: Create MinIO buckets ────────────────────────
+echo "🪣 Creating MinIO buckets..."
+docker-compose -f docker/docker-compose.yml up -d minio
+sleep 4
+python3 -c "
+import boto3
+from botocore.client import Config
+c = boto3.client('s3', endpoint_url='http://localhost:9000',
+    aws_access_key_id='f1minio', aws_secret_access_key='f1minio123',
+    config=Config(signature_version='s3v4'), region_name='us-east-1')
+for bucket in ['f1-bronze', 'f1-silver', 'f1-gold']:
+    try:
+        c.head_bucket(Bucket=bucket)
+        print(f'  {bucket} already exists')
+    except:
+        c.create_bucket(Bucket=bucket)
+        print(f'  {bucket} created')
+"
+echo "✅ MinIO buckets ready"
+echo ""
+
 # ── Step 4: Start PostgreSQL ───────────────────────────────
 echo "🐳 Starting PostgreSQL..."
 docker-compose -f docker/docker-compose.yml up -d
