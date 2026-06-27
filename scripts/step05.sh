@@ -43,6 +43,34 @@ print(f'✅ Bronze layer has {count} objects')
 echo ""
 
 # ── Run Silver transformations ─────────────────────────────
+echo "🪣 Creating Silver bucket in MinIO..."
+python3 -c "
+import boto3
+from botocore.client import Config
+c = boto3.client('s3', endpoint_url='http://localhost:9000', aws_access_key_id='f1minio', aws_secret_access_key='f1minio123', config=Config(signature_version='s3v4'), region_name='us-east-1')
+try:
+    c.head_bucket(Bucket='f1-silver')
+    print('✅ f1-silver bucket already exists')
+except:
+    c.create_bucket(Bucket='f1-silver')
+    print('✅ f1-silver bucket created')
+"
+echo ""
+echo "🪣 Creating Silver bucket in MinIO..."
+python3 -c "
+import boto3
+from botocore.client import Config
+c = boto3.client('s3', endpoint_url='http://localhost:9000',
+    aws_access_key_id='f1minio', aws_secret_access_key='f1minio123',
+    config=Config(signature_version='s3v4'), region_name='us-east-1')
+try:
+    c.head_bucket(Bucket='f1-silver')
+    print('✅ f1-silver bucket already exists')
+except:
+    c.create_bucket(Bucket='f1-silver')
+    print('✅ f1-silver bucket created')
+"
+echo ""
 echo "⚡ Running PySpark Silver transformations..."
 echo "   (This will take 5-10 minutes)"
 echo ""

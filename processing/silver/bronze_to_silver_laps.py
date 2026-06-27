@@ -16,12 +16,12 @@ from utils.logger import get_logger
 log = get_logger(__name__)
 
 SCHEMA = StructType([
-    StructField("season",     IntegerType(), True),
-    StructField("round",      IntegerType(), True),
     StructField("lap_number", IntegerType(), True),
     StructField("driver_id",  StringType(),  True),
     StructField("position",   IntegerType(), True),
     StructField("time",       StringType(),  True),
+    StructField("season",     IntegerType(), True),
+    StructField("round",      IntegerType(), True),
 ])
 
 BRONZE_PATH  = "s3a://f1-bronze/ergast/lap_times/lap_times.csv"
