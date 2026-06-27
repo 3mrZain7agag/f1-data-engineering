@@ -26,7 +26,9 @@ echo "  → bash scripts/start.sh          Start everything"
 echo "  → bash scripts/start_postgres.sh Start PostgreSQL only"
 echo "  → bash scripts/start_minio.sh    Start MinIO only"
 echo "  → bash scripts/start_airflow.sh  Start Airflow only"
-echo "  → bash scripts/stop.sh           Stop everything"
+echo "  → bash scripts/stop.sh           Stop everything
+  → bash scripts/start_spark.sh    Start Spark only
+  → bash scripts/stop_spark.sh     Stop Spark only"
 echo "  → bash scripts/step05.sh         Run Silver layer (PySpark)"
 echo "=================================================="
 echo ""
