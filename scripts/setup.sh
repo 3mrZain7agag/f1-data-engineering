@@ -19,7 +19,7 @@ pip install -r requirements.txt -q
 echo "✅ Python dependencies installed"
 echo ""
 
-# ── Step 1.5: Install Java 17 (required for Spark) ──────────
+# ── Step 1.5: Install Java 17 (required for Spark) ────────
 echo "☕ Installing Java 17..."
 sudo apt-get update -q && sudo apt-get install -y openjdk-17-jdk -q
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
@@ -58,57 +58,15 @@ sed -i "s|enable_proxy_fix = False|enable_proxy_fix = True|" airflow/airflow.cfg
 echo "✅ Airflow initialized"
 echo ""
 
-# ── Step 3.5: Create MinIO buckets ────────────────────────
-echo "🪣 Creating MinIO buckets..."
-docker-compose -f docker/docker-compose.yml up -d minio
-sleep 4
-python3 -c "
-import boto3
-from botocore.client import Config
-c = boto3.client('s3', endpoint_url='http://localhost:9000',
-    aws_access_key_id='f1minio', aws_secret_access_key='f1minio123',
-    config=Config(signature_version='s3v4'), region_name='us-east-1')
-for bucket in ['f1-bronze', 'f1-silver', 'f1-gold']:
-    try:
-        c.head_bucket(Bucket=bucket)
-        print(f'  {bucket} already exists')
-    except:
-        c.create_bucket(Bucket=bucket)
-        print(f'  {bucket} created')
-"
-echo "✅ MinIO buckets ready"
-echo ""
-
-# ── Step 3.5: Create MinIO buckets ────────────────────────
-echo "🪣 Creating MinIO buckets..."
-docker-compose -f docker/docker-compose.yml up -d minio
-sleep 4
-python3 -c "
-import boto3
-from botocore.client import Config
-c = boto3.client('s3', endpoint_url='http://localhost:9000',
-    aws_access_key_id='f1minio', aws_secret_access_key='f1minio123',
-    config=Config(signature_version='s3v4'), region_name='us-east-1')
-for bucket in ['f1-bronze', 'f1-silver', 'f1-gold']:
-    try:
-        c.head_bucket(Bucket=bucket)
-        print(f'  {bucket} already exists')
-    except:
-        c.create_bucket(Bucket=bucket)
-        print(f'  {bucket} created')
-"
-echo "✅ MinIO buckets ready"
-echo ""
-
-# ── Step 4: Start PostgreSQL ───────────────────────────────
-echo "🐳 Starting PostgreSQL..."
+# ── Step 4: Start Docker services ─────────────────────────
+echo "🐳 Starting PostgreSQL + MinIO + Spark..."
 docker-compose -f docker/docker-compose.yml up -d
-echo "✅ PostgreSQL started"
+echo "✅ Docker services started"
 echo ""
 
-# ── Step 5: Wait for PostgreSQL ────────────────────────────
-echo "⏳ Waiting for PostgreSQL to be ready..."
-sleep 5
+# ── Step 5: Wait for services to be ready ─────────────────
+echo "⏳ Waiting for services to be ready..."
+sleep 6
 
 # ── Step 6: Create database schema ────────────────────────
 echo "🏗️  Creating Star Schema tables..."
@@ -116,16 +74,26 @@ docker exec -i f1_postgres psql -U f1user -d f1_warehouse < warehouse/schema.sql
 echo "✅ Schema created"
 echo ""
 
-echo "=================================================="
-echo "  ✅ Setup Complete!"
-echo ""
-echo "  Next steps:"
-echo "  → Run: bash scripts/start.sh    (start all services)"
-echo "  → Then: bash scripts/step01.sh  (pull F1 data)"
-echo "=================================================="
+# ── Step 7: Create MinIO buckets ──────────────────────────
+echo "🪣 Creating MinIO buckets..."
+python3 -c "
+import boto3
+from botocore.client import Config
+c = boto3.client('s3', endpoint_url='http://localhost:9000',
+    aws_access_key_id='f1minio', aws_secret_access_key='f1minio123',
+    config=Config(signature_version='s3v4'), region_name='us-east-1')
+for bucket in ['f1-bronze', 'f1-silver', 'f1-gold']:
+    try:
+        c.head_bucket(Bucket=bucket)
+        print(f'  {bucket} already exists')
+    except:
+        c.create_bucket(Bucket=bucket)
+        print(f'  {bucket} created')
+"
+echo "✅ MinIO buckets ready"
 echo ""
 
-# ── Fix: Enable Airflow REST API for VS Code extension ─────
+# ── Step 8: Enable Airflow REST API ───────────────────────
 echo "🔌 Enabling Airflow REST API..."
 python3 -c "
 content = open('airflow/airflow.cfg').read()
@@ -137,3 +105,13 @@ open('airflow/airflow.cfg', 'w').write(content)
 print('Done')
 "
 echo "✅ REST API enabled"
+echo ""
+
+echo "=================================================="
+echo "  ✅ Setup Complete!"
+echo ""
+echo "  Next steps:"
+echo "  → Run: bash scripts/start.sh    (start all services)"
+echo "  → Then: bash scripts/step01.sh  (pull F1 data)"
+echo "=================================================="
+echo ""
