@@ -225,15 +225,16 @@ LIMIT 10;
 
 ### DAGs
 ```
-dag_ingest_f1          → pulls data from API
-dag_load_warehouse     → loads PostgreSQL DWH
-dag_ingest_to_bronze   → uploads to MinIO Bronze
+dag_ingest_f1          → Step 01: pulls data from API        (Mon 02:00 UTC)
+dag_ingest_to_bronze   → Step 04: uploads to MinIO Bronze    (Mon 03:00 UTC)
+dag_bronze_to_silver   → Step 05: PySpark Silver layer       (Mon 04:00 UTC)
+dag_load_warehouse     → Step 02: loads PostgreSQL DWH       (Mon 05:00 UTC)
 ```
 
 ### Run it
 ```bash
 bash scripts/start.sh
-bash scripts/step03.sh   # triggers + unpauses all DAGs
+bash scripts/step03.sh   # triggers + unpauses all 4 DAGs
 # Open port 8080 → admin / admin123
 ```
 
@@ -356,7 +357,8 @@ f1-data-engineering/
 ├── orchestration/dags/
 │   ├── dag_ingest_f1.py
 │   ├── dag_load_warehouse.py
-│   └── dag_ingest_to_bronze.py
+│   ├── dag_ingest_to_bronze.py
+│   └── dag_bronze_to_silver.py   ← Step 05: PySpark Silver DAG
 ├── scripts/
 │   ├── setup.sh                  ← First-time setup (8 steps)
 │   ├── start.sh                  ← Start all services
@@ -429,4 +431,4 @@ f1-data-engineering/
 | `docs:` | Documentation update |
 | `refactor:` | Code improvement |
 | `test:` | Adding tests |
-| `chore:` | Setup, scripts, config |bash scripts/git_save.sh "docs: update README with Step 05 PySpark Silver layer"
+| `chore:` | Setup, scripts, config |
