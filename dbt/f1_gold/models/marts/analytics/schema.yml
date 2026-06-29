@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: agg_driver_season_stats
+    description: "Pre-aggregated driver statistics per season"
+    columns:
+      - name: driver_id
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null
+      - name: total_points
+        tests:
+          - not_null
+
+  - name: agg_constructor_season_stats
+    description: "Pre-aggregated constructor statistics per season"
+    columns:
+      - name: constructor_id
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null

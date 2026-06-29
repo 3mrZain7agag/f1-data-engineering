@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: fact_race_results
+    description: "Core fact table — one row per driver per race"
+    columns:
+      - name: result_id
+        description: "Unique result identifier"
+        tests:
+          - unique
+          - not_null
+      - name: driver_id
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null
+      - name: points
+        tests:
+          - not_null
+
+  - name: dim_drivers
+    description: "Driver dimension table"
+    columns:
+      - name: driver_id
+        tests:
+          - unique
+          - not_null
+      - name: full_name
+        tests:
+          - not_null
+
+  - name: dim_races
+    description: "Race dimension table"
+    columns:
+      - name: race_id
+        tests:
+          - unique
+          - not_null
+      - name: season
+        tests:
+          - not_null
+
+  - name: dim_circuits
+    description: "Circuit dimension table"
+    columns:
+      - name: circuit_id
+        tests:
+          - unique
+          - not_null
