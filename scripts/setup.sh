@@ -34,6 +34,12 @@ pip install apache-airflow==2.9.3 -q \
 echo "✅ Airflow installed"
 echo ""
 
+# ── Step 2.5: Install dbt-core + dbt-spark ────────────────
+echo "🏗️  Installing dbt..."
+pip install dbt-core dbt-spark -q
+echo "✅ dbt installed"
+echo ""
+
 # ── Step 3: Initialize Airflow ─────────────────────────────
 echo "⚙️  Initializing Airflow..."
 export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
@@ -56,6 +62,41 @@ sed -i "s|dags_folder = .*|dags_folder = /workspaces/f1-data-engineering/orchest
 sed -i "s|enable_proxy_fix = False|enable_proxy_fix = True|" airflow/airflow.cfg 2>/dev/null || true
 
 echo "✅ Airflow initialized"
+echo ""
+
+# ── Step 3.5: Configure dbt profile ───────────────────────
+echo "🔧 Configuring dbt profile..."
+mkdir -p ~/.dbt
+cat > ~/.dbt/profiles.yml << "PROFILEEOF"
+f1_gold:
+  target: dev
+  outputs:
+    dev:
+      type: spark
+      method: session
+      schema: gold
+      host: localhost
+      port: 7077
+      cluster: local
+      connect_retries: 3
+      connect_timeout: 60
+      server_side_parameters:
+        spark.sql.extensions: "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+        spark.sql.catalog.f1_catalog: "org.apache.iceberg.spark.SparkCatalog"
+        spark.sql.catalog.f1_catalog.type: "hadoop"
+        spark.sql.catalog.f1_catalog.warehouse: "s3a://f1-silver/"
+        spark.sql.catalog.spark_catalog: "org.apache.iceberg.spark.SparkSessionCatalog"
+        spark.sql.catalog.spark_catalog.type: "hive"
+        spark.hadoop.fs.s3a.endpoint: "http://localhost:9000"
+        spark.hadoop.fs.s3a.access.key: "f1minio"
+        spark.hadoop.fs.s3a.secret.key: "f1minio123"
+        spark.hadoop.fs.s3a.path.style.access: "true"
+        spark.hadoop.fs.s3a.impl: "org.apache.hadoop.fs.s3a.S3AFileSystem"
+        spark.hadoop.fs.s3a.aws.credentials.provider: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+        spark.hadoop.fs.s3a.connection.ssl.enabled: "false"
+        spark.jars.packages: "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262"
+PROFILEEOF
+echo "✅ dbt profile configured"
 echo ""
 
 # ── Step 4: Start Docker services ─────────────────────────
