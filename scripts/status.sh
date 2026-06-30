@@ -19,6 +19,7 @@ BRONZE=$(python3 -c "import boto3,botocore.client as b;c=boto3.client('s3',endpo
 [ "$BRONZE" -gt 0 ] 2>/dev/null && echo "     MinIO Bronze   → ✅ $BRONZE objects in f1-bronze" || echo "     MinIO Bronze   → ❌ Empty (run step04.sh)"
 SILVER=$(python3 -c "import boto3,botocore.client as b;c=boto3.client('s3',endpoint_url='http://localhost:9000',aws_access_key_id='f1minio',aws_secret_access_key='f1minio123',config=b.Config(signature_version='s3v4'),region_name='us-east-1');print(len(c.list_objects_v2(Bucket='f1-silver').get('Contents',[])))" 2>/dev/null || echo 0)
 [ "$SILVER" -gt 0 ] 2>/dev/null && echo "     MinIO Silver   → ✅ $SILVER objects in f1-silver" || echo "     MinIO Silver   → ❌ Empty (run step05.sh)"
+[ -d "dbt/f1_gold/spark-warehouse/gold_gold.db" ] && echo "     dbt Gold       → ✅ $(ls dbt/f1_gold/spark-warehouse/gold_gold.db 2>/dev/null | wc -l) tables" || echo "     dbt Gold       → ❌ Not built (run step06.sh)"
 echo ""
 echo "=================================================="
 echo "  📋 Quick Commands:"
