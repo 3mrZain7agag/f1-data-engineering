@@ -39,7 +39,7 @@ A portfolio-grade, end-to-end Data Engineering platform that demonstrates master
 | 03 | Airflow Orchestration | ✅ Complete | Apache Airflow, DAGs, psycopg2 |
 | 04 | Bronze Data Lake | ✅ Complete | MinIO, boto3, S3-compatible storage |
 | 05 | PySpark Silver Layer | ✅ Complete | Apache Spark 3.5, Iceberg, Java 17 |
-| 06 | dbt Gold Layer | 🔲 Upcoming | dbt-core, dbt-spark |
+| 06 | dbt Gold Layer | ✅ Complete | dbt-core, dbt-spark, Parquet |
 | 07 | Data Quality | 🔲 Upcoming | Great Expectations |
 | 08 | Kafka Streaming | 🔲 Upcoming | Apache Kafka, Spark Streaming |
 | 09 | FastF1 Telemetry | 🔲 Upcoming | FastF1, multi-source ingestion |
@@ -73,6 +73,7 @@ bash scripts/status.sh
 bash scripts/step03.sh   # Airflow: pull data + load warehouse
 bash scripts/step04.sh   # Upload raw CSVs to Bronze (MinIO)
 bash scripts/step05.sh   # Transform Bronze → Silver (PySpark + Iceberg)
+bash scripts/step06.sh   # Transform Silver → Gold (dbt)
 ```
 
 ### Save Your Work to GitHub
@@ -117,6 +118,7 @@ bash scripts/git_save.sh "your message here"
 | `step03.sh` | `bash scripts/step03.sh` | Trigger + unpause Airflow DAGs |
 | `step04.sh` | `bash scripts/step04.sh` | Upload raw CSVs to Bronze (MinIO) |
 | `step05.sh` | `bash scripts/step05.sh` | Transform Bronze → Silver (PySpark) |
+| `step06.sh` | `bash scripts/step06.sh` | Transform Silver → Gold (dbt) |
 
 ### 📅 Daily Workflow
 ```
@@ -329,6 +331,105 @@ MinIO Silver (clean Parquet/Iceberg)
 
 ---
 
+
+
+---
+
+## ✅ Step 06 — dbt Gold Layer
+
+### What it does
+Reads Silver layer data and applies business logic — joins, aggregations, and
+Star Schema modeling — using **dbt** (data build tool). Produces analytics-ready
+Gold tables with built-in data quality tests.
+
+### What is dbt?
+dbt lets you write transformations as simple SQL SELECT statements. It handles
+table creation, dependency management (via `ref()`), testing, and documentation
+generation automatically.
+
+### dbt Project Structure
+```
+dbt/f1_gold/
+├── dbt_project.yml
+├── models/
+│   ├── staging/              ← 1:1 views on Silver tables
+│   │   ├── stg_races.sql
+│   │   ├── stg_results.sql
+│   │   ├── stg_drivers.sql
+│   │   ├── stg_circuits.sql
+│   │   ├── stg_qualifying.sql
+│   │   ├── stg_pit_stops.sql
+│   │   └── stg_lap_times.sql
+│   └── marts/
+│       ├── core/              ← Star Schema fact + dim tables
+│       │   ├── dim_drivers.sql
+│       │   ├── dim_circuits.sql
+│       │   ├── dim_races.sql
+│       │   ├── fact_race_results.sql
+│       │   ├── fact_lap_times.sql
+│       │   ├── fact_pit_stops.sql
+│       │   └── schema.yml     ← tests + descriptions
+│       └── analytics/         ← Pre-aggregated reporting tables
+│           ├── agg_driver_season_stats.sql
+│           ├── agg_constructor_season_stats.sql
+│           ├── agg_circuit_stats.sql
+│           └── schema.yml
+```
+
+### Gold Tables
+| Model | Type | Description |
+|-------|------|--------------|
+| dim_drivers | Dimension | Driver profiles |
+| dim_circuits | Dimension | Circuit metadata |
+| dim_races | Dimension | Race calendar |
+| fact_race_results | Fact | Results + qualifying joined |
+| fact_lap_times | Fact | Clean lap times |
+| fact_pit_stops | Fact | Clean pit stop events |
+| agg_driver_season_stats | Analytics | Wins, podiums, points per driver per season |
+| agg_constructor_season_stats | Analytics | Team performance, DNF rate per season |
+| agg_circuit_stats | Analytics | Circuit history and lap records |
+
+### Run it
+```bash
+bash scripts/step06.sh   # runs dbt models + tests
+```
+
+### Verified accuracy
+- ✅ 2024 Drivers Champion: Verstappen (399 pts, 9 wins)
+- ✅ 2024 Constructors Champion: McLaren (609 pts, 6 wins)
+- ✅ Bahrain GP 2024 podium: Verstappen, Perez, Sainz
+
+### Data Quality Tests
+18 dbt tests covering `not_null`, `unique` constraints across all dimension
+keys and critical fact columns — all passing.
+
+### Key features
+- ✅ dbt-core 1.11.11 + dbt-spark 1.10.3
+- ✅ 7 staging models, 6 core models, 3 analytics models
+- ✅ 18 automated data quality tests
+- ✅ Parquet file format (explicit `+file_format: parquet` config)
+- ✅ `dag_silver_to_gold` Airflow DAG with auto-clean before each run
+- ✅ Auto-configured `~/.dbt/profiles.yml` in setup.sh
+
+### Known limitation
+**Gold tables are stored locally** (`dbt/f1_gold/spark-warehouse/`), not in
+MinIO's `f1-gold` bucket. This is a known limitation of `dbt-spark`'s session
+method when combined with a custom Iceberg catalog — the Hive metastore and
+Iceberg catalog don't share state cleanly in local mode.
+
+This will be resolved naturally in **Step 10** when dbt connects directly to
+**AWS Redshift** instead of Spark — which is how dbt is used in the vast
+majority of production environments (dbt + Spark/Iceberg locally is primarily
+a learning exercise; dbt + cloud warehouse is the standard production pattern).
+
+### Lessons learned
+- dbt's `session` method with a custom Iceberg catalog has metastore conflicts
+- `LOCATION_ALREADY_EXISTS` errors require cleaning `spark-warehouse/` before re-runs
+- Default Hive table format isn't Parquet — must set `+file_format: parquet` explicitly
+- **Never commit `metastore_db/`, `spark-warehouse/`, or `target/` to git** — these are large, binary, constantly-changing files (197 files removed after initial mistake)
+
+---
+
 ## 🗂️ Project Structure
 
 ```
@@ -358,7 +459,8 @@ f1-data-engineering/
 │   ├── dag_ingest_f1.py
 │   ├── dag_load_warehouse.py
 │   ├── dag_ingest_to_bronze.py
-│   └── dag_bronze_to_silver.py   ← Step 05: PySpark Silver DAG
+│   ├── dag_bronze_to_silver.py   ← Step 05: PySpark Silver DAG
+│   └── dag_silver_to_gold.py     ← Step 06: dbt Gold DAG
 ├── scripts/
 │   ├── setup.sh                  ← First-time setup (8 steps)
 │   ├── start.sh                  ← Start all services
@@ -377,6 +479,7 @@ f1-data-engineering/
 │   ├── step03.sh                 ← Trigger Airflow
 │   ├── step04.sh                 ← Upload to Bronze
 │   ├── step05.sh                 ← Bronze → Silver
+│   ├── step06.sh                 ← Silver → Gold (dbt)
 │   └── git_save.sh               ← Save to GitHub
 ├── utils/
 │   └── logger.py                 ← JSON logging
@@ -402,6 +505,8 @@ f1-data-engineering/
 | PySpark | 3.5.0 | Distributed data processing |
 | Apache Iceberg | 1.5.0 | ACID table format on S3/MinIO |
 | Java | 17 | Required for Spark |
+| dbt-core | 1.11.11 | SQL transformation framework |
+| dbt-spark | 1.10.3 | dbt Spark adapter |
 | PostgreSQL | 15 | Data Warehouse |
 | MinIO | Latest | Local S3-compatible storage |
 | Apache Airflow | 2.9.3 | Pipeline orchestration |
