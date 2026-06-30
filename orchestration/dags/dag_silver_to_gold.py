@@ -25,7 +25,19 @@ default_args = {
 
 def run_dbt_gold():
     """Run dbt models and tests for Gold layer."""
+    import shutil
     dbt_dir = '/workspaces/f1-data-engineering/dbt/f1_gold'
+
+    # Clean spark-warehouse to avoid LOCATION_ALREADY_EXISTS errors
+    warehouse_path = f'{dbt_dir}/spark-warehouse'
+    if os.path.exists(warehouse_path):
+        shutil.rmtree(warehouse_path)
+        print(f'Cleaned {warehouse_path}')
+
+    target_path = f'{dbt_dir}/target'
+    if os.path.exists(target_path):
+        shutil.rmtree(target_path)
+        print(f'Cleaned {target_path}')
 
     env = os.environ.copy()
     env['JAVA_HOME'] = '/usr/lib/jvm/java-17-openjdk-amd64'
