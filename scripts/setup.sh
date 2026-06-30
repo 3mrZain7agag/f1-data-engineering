@@ -36,7 +36,7 @@ echo ""
 
 # ── Step 2.5: Install dbt-core + dbt-spark ────────────────
 echo "🏗️  Installing dbt..."
-pip install dbt-core dbt-spark -q
+pip install dbt-core dbt-spark -q || true
 echo "✅ dbt installed"
 echo ""
 

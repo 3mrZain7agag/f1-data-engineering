@@ -32,6 +32,7 @@ cd dbt/f1_gold
 dbt run --full-refresh
 
 echo ""
+sleep 5
 echo "🧪 Running dbt tests..."
 dbt test
 
