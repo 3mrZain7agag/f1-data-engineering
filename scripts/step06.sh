@@ -27,6 +27,9 @@ echo "✅ Java 17 active"
 echo ""
 
 # ── Run dbt ────────────────────────────────────────────────
+echo "🧹 Cleaning spark-warehouse to avoid LOCATION_ALREADY_EXISTS..."
+rm -rf dbt/f1_gold/spark-warehouse dbt/f1_gold/target
+
 echo "🏗️  Running dbt models..."
 cd dbt/f1_gold
 dbt run --full-refresh
