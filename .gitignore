@@ -234,3 +234,11 @@ airflow/airflow.db
 airflow/*.cfg
 airflow/*.pid
 airflow/webserver_config.py
+
+# dbt
+dbt/f1_gold/metastore_db/
+dbt/f1_gold/spark-warehouse/
+dbt/f1_gold/target/
+dbt/f1_gold/logs/
+dbt/f1_gold/dbt_packages/
+derby.log
