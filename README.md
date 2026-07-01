@@ -480,6 +480,7 @@ f1-data-engineering/
 │   ├── step04.sh                 ← Upload to Bronze
 │   ├── step05.sh                 ← Bronze → Silver
 │   ├── step06.sh                 ← Silver → Gold (dbt)
+│   ├── steps.sh                  ← Steps reference dictionary
 │   └── git_save.sh               ← Save to GitHub
 ├── utils/
 │   └── logger.py                 ← JSON logging
