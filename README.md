@@ -481,7 +481,8 @@ f1-data-engineering/
 │   ├── step05.sh                 ← Bronze → Silver
 │   ├── step06.sh                 ← Silver → Gold (dbt)
 │   ├── steps.sh                  ← Steps reference dictionary
-│   └── git_save.sh               ← Save to GitHub
+│   ├── git_save.sh               ← Save to GitHub
+│   └── view_gold.sh              ← Quick Gold layer queries
 ├── utils/
 │   └── logger.py                 ← JSON logging
 ├── docker/
