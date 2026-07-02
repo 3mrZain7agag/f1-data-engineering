@@ -35,6 +35,7 @@ with DAG(
     upload_to_bronze = PythonOperator(
         task_id='upload_to_bronze',
         python_callable=ingest_to_bronze,
+        op_kwargs={'force': True},
         execution_timeout=timedelta(minutes=30),
     )
 
