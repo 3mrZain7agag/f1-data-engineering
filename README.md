@@ -40,7 +40,7 @@ A portfolio-grade, end-to-end Data Engineering platform that demonstrates master
 | 04 | Bronze Data Lake | ✅ Complete | MinIO, boto3, S3-compatible storage |
 | 05 | PySpark Silver Layer | ✅ Complete | Apache Spark 3.5, Iceberg, Java 17 |
 | 06 | dbt Gold Layer | ✅ Complete | dbt-core, dbt-spark, Parquet |
-| 07 | Data Quality | 🔲 Upcoming | Great Expectations |
+| 07 | Data Quality | ✅ Complete | Great Expectations |
 | 08 | Kafka Streaming | 🔲 Upcoming | Apache Kafka, Spark Streaming |
 | 09 | FastF1 Telemetry | 🔲 Upcoming | FastF1, multi-source ingestion |
 | 10 | Cloud Migration (AWS) | 🔲 Upcoming | Terraform, S3, MSK, Glue, Redshift |
@@ -73,6 +73,7 @@ bash scripts/status.sh
 bash scripts/step03.sh   # Airflow: pull data + load warehouse
 bash scripts/step04.sh   # Upload raw CSVs to Bronze (MinIO)
 bash scripts/step05.sh   # Transform Bronze → Silver (PySpark + Iceberg)
+bash scripts/step07.sh   # Validate Silver data quality (Great Expectations)
 bash scripts/step06.sh   # Transform Silver → Gold (dbt)
 ```
 
@@ -119,6 +120,7 @@ bash scripts/git_save.sh "your message here"
 | `step04.sh` | `bash scripts/step04.sh` | Upload raw CSVs to Bronze (MinIO) |
 | `step05.sh` | `bash scripts/step05.sh` | Transform Bronze → Silver (PySpark) |
 | `step06.sh` | `bash scripts/step06.sh` | Transform Silver → Gold (dbt) |
+| `step07.sh` | `bash scripts/step07.sh` | Validate Silver data quality (Great Expectations) |
 
 ### 📅 Daily Workflow
 ```
@@ -430,6 +432,60 @@ a learning exercise; dbt + cloud warehouse is the standard production pattern).
 
 ---
 
+
+
+---
+
+## ✅ Step 07 — Data Quality (Great Expectations)
+
+### What it does
+Validates the Silver layer against a set of automated data quality rules
+**before** dbt is allowed to build the Gold layer. Catches bad data early —
+right after PySpark transformation, not downstream in a dashboard.
+
+### Where It Sits in the Pipeline
+```
+Bronze → PySpark → Silver → [Great Expectations Checkpoint] → dbt → Gold
+                                        │
+                                   ❌ FAIL → halt, alert
+                                   ✅ PASS → continue
+```
+
+### What the Expectations Are Based On
+| Source | Example |
+|--------|---------|
+| F1 domain knowledge | `position` must be between 1-24 (max grid + margin) |
+| Schema requirements | `driver_id` must never be null (used as join key everywhere) |
+| Values already used in Step 05 | `lap_time_ms` between 50,000-300,000 (same filter used in `bronze_to_silver_laps.py`) |
+| Business logic | `points` must be between 0-26 (F1 scoring range) |
+| Uniqueness constraints | No duplicate `(season, round, driver_id)` combinations |
+
+### Checkpoints Built
+| Table | Checks |
+|-------|--------|
+| silver.race_results | season not null, driver_id not null, position [1-24], points [0-26], no duplicates, status not null |
+| silver.lap_times | driver_id not null, lap_number [1-100], lap_time_ms realistic range, no duplicate season+round+driver+lap |
+
+### Run it
+```bash
+bash scripts/step07.sh
+```
+
+### Key features
+- ✅ Great Expectations 0.18.19
+- ✅ 10 automated checks across 2 Silver tables
+- ✅ `run_all_checks.py` — master runner with pass/fail summary
+- ✅ Exit code 1 on failure — can halt CI/CD or Airflow pipelines
+- ✅ `dag_data_quality` Airflow DAG — runs between Silver and Gold DAGs
+
+### Lessons learned
+- Silver layer column names come straight from the raw source schema
+  (`position`, not `finish_position` — that renaming happens later in dbt staging)
+- Great Expectations' `ephemeral` context mode works well for lightweight,
+  no-persistent-config validation — no need for a full GE project setup
+
+---
+
 ## 🗂️ Project Structure
 
 ```
@@ -460,6 +516,7 @@ f1-data-engineering/
 │   ├── dag_load_warehouse.py
 │   ├── dag_ingest_to_bronze.py
 │   ├── dag_bronze_to_silver.py   ← Step 05: PySpark Silver DAG
+│   ├── dag_data_quality.py       ← Step 07: Great Expectations DAG
 │   └── dag_silver_to_gold.py     ← Step 06: dbt Gold DAG
 ├── scripts/
 │   ├── setup.sh                  ← First-time setup (8 steps)
@@ -480,9 +537,9 @@ f1-data-engineering/
 │   ├── step04.sh                 ← Upload to Bronze
 │   ├── step05.sh                 ← Bronze → Silver
 │   ├── step06.sh                 ← Silver → Gold (dbt)
+│   ├── step07.sh                 ← Data quality checkpoints
 │   ├── steps.sh                  ← Steps reference dictionary
-│   ├── git_save.sh               ← Save to GitHub
-│   └── view_gold.sh              ← Quick Gold layer queries
+│   └── git_save.sh               ← Save to GitHub
 ├── utils/
 │   └── logger.py                 ← JSON logging
 ├── docker/
@@ -509,6 +566,7 @@ f1-data-engineering/
 | Java | 17 | Required for Spark |
 | dbt-core | 1.11.11 | SQL transformation framework |
 | dbt-spark | 1.10.3 | dbt Spark adapter |
+| great_expectations | 0.18.19 | Data quality validation |
 | PostgreSQL | 15 | Data Warehouse |
 | MinIO | Latest | Local S3-compatible storage |
 | Apache Airflow | 2.9.3 | Pipeline orchestration |
