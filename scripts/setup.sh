@@ -40,6 +40,12 @@ pip install dbt-core dbt-spark -q || true
 echo "✅ dbt installed"
 echo ""
 
+# ── Step 2.6: Install Great Expectations ──────────────────
+echo "🔍 Installing Great Expectations..."
+pip install great_expectations==0.18.19 -q || true
+echo "✅ Great Expectations installed"
+echo ""
+
 # ── Step 3: Initialize Airflow ─────────────────────────────
 echo "⚙️  Initializing Airflow..."
 export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow

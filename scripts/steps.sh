@@ -115,14 +115,14 @@ cat << 'EOF'
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ STEP 07 — Data Quality (Great Expectations)        [UPCOMING]   │
+│ STEP 07 — Data Quality (Great Expectations)                     │
 ├─────────────────────────────────────────────────────────────────┤
-│ What it does:  Validates Silver/Gold data quality with          │
-│                automated checkpoints                            │
-├─────────────────────────────────────────────────────────────────┤
-│ Prerequisites: Step 06 complete                                 │
-├─────────────────────────────────────────────────────────────────┤
-│ Run with:      bash scripts/step07.sh  (not yet built)          │
+│ What it does:  Validates Silver layer data quality with         │
+│                automated checkpoints before Gold build          │
+│ Prerequisites: Step 05 complete, Java 17 active                 │
+│ Run with:      bash scripts/step07.sh                           │
+│ Output:        Pass/Fail report for race_results, lap_times     │
+│ Duration:      ~30 seconds                                      │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
