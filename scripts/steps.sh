@@ -119,9 +119,13 @@ cat << 'EOF'
 ├─────────────────────────────────────────────────────────────────┤
 │ What it does:  Validates Silver layer data quality with         │
 │                automated checkpoints before Gold build          │
+├─────────────────────────────────────────────────────────────────┤
 │ Prerequisites: Step 05 complete, Java 17 active                 │
+├─────────────────────────────────────────────────────────────────┤
 │ Run with:      bash scripts/step07.sh                           │
+├─────────────────────────────────────────────────────────────────┤
 │ Output:        Pass/Fail report for race_results, lap_times     │
+├─────────────────────────────────────────────────────────────────┤
 │ Duration:      ~30 seconds                                      │
 └─────────────────────────────────────────────────────────────────┘
 
