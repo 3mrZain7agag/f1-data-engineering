@@ -34,6 +34,7 @@ airflow dags unpause dag_load_warehouse
 airflow dags unpause dag_ingest_to_bronze
 airflow dags unpause dag_bronze_to_silver
 airflow dags unpause dag_silver_to_gold
+airflow dags unpause dag_data_quality
 airflow dags trigger dag_ingest_f1
 echo "✅ dag_ingest_f1 triggered"
 echo ""
