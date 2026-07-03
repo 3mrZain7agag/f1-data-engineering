@@ -130,14 +130,23 @@ cat << 'EOF'
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ STEP 08 — Kafka Streaming                            [UPCOMING] │
+│ STEP 08 — Kafka Streaming Layer                                 │
 ├─────────────────────────────────────────────────────────────────┤
-│ What it does:  Simulates real-time race data via Kafka +        │
-│                Spark Structured Streaming                       │
+│ What it does:  Replays historical lap data through Kafka as     │
+│                a simulated live race, consumed in real-time     │
+│                by Spark Structured Streaming into Bronze        │
 ├─────────────────────────────────────────────────────────────────┤
-│ Prerequisites: Step 06 complete                                 │
+│ Prerequisites: Step 05 complete, Kafka running                  │
+│                (bash scripts/start_kafka.sh), Java 17 active    │
 ├─────────────────────────────────────────────────────────────────┤
-│ Run with:      bash scripts/step08.sh  (not yet built)          │
+│ Run with:      bash scripts/step08.sh                           │
+│                bash scripts/step08.sh 2023 5  (season/round)    │
+├─────────────────────────────────────────────────────────────────┤
+│ Output:        s3://f1-bronze/kafka/lap_events/ (streamed)      │
+├─────────────────────────────────────────────────────────────────┤
+│ Monitor at:    Port 8085 → Kafka UI                             │
+├─────────────────────────────────────────────────────────────────┤
+│ Duration:      ~1-2 minutes per race replay                     │
 └─────────────────────────────────────────────────────────────────┘
 
 ===================================================================

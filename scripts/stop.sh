@@ -14,6 +14,12 @@ echo ""
 echo "✈️  Stopping Airflow..."
 pkill -f "airflow webserver" 2>/dev/null && echo "✅ Airflow Webserver stopped" || echo "   (Webserver was not running)"
 pkill -f "airflow scheduler" 2>/dev/null && echo "✅ Airflow Scheduler stopped" || echo "   (Scheduler was not running)"
+
+# Stop streaming consumer if running
+if [ -f /tmp/f1_consumer.pid ]; then
+    kill "$(cat /tmp/f1_consumer.pid)" 2>/dev/null && echo "✅ Streaming consumer stopped"
+    rm -f /tmp/f1_consumer.pid
+fi
 echo ""
 
 # ── Stop PostgreSQL ────────────────────────────────────────

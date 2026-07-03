@@ -42,6 +42,25 @@ else
     echo "  ⚡ Spark Worker  → ❌ Not running"
 fi
 
+# ── Kafka ──────────────────────────────────────────────────
+docker exec f1_kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "  📨 Kafka         → ✅ Running (port 9092)"
+else
+    echo "  📨 Kafka         → ❌ Not running"
+fi
+
+docker ps | grep f1_kafka_ui > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "  🌐 Kafka UI      → ✅ Running (port 8085)"
+fi
+
+if [ -f /tmp/f1_consumer.pid ] && kill -0 "$(cat /tmp/f1_consumer.pid)" 2>/dev/null; then
+    echo "  🌊 Stream Consumer → ✅ Running (PID: $(cat /tmp/f1_consumer.pid))"
+else
+    echo "  🌊 Stream Consumer → ❌ Not running"
+fi
+
 # ── Airflow Webserver ──────────────────────────────────────
 curl -s http://localhost:8080/health > /dev/null 2>&1
 if [ $? -eq 0 ]; then
@@ -138,12 +157,14 @@ echo "  → bash scripts/start_postgres.sh Start PostgreSQL only"
 echo "  → bash scripts/start_minio.sh    Start MinIO only"
 echo "  → bash scripts/start_airflow.sh  Start Airflow only"
 echo "  → bash scripts/start_spark.sh    Start Spark only"
+echo "  → bash scripts/start_kafka.sh    Start Kafka only"
 echo ""
 echo "  → bash scripts/stop.sh           Stop everything"
 echo "  → bash scripts/stop_postgres.sh  Stop PostgreSQL only"
 echo "  → bash scripts/stop_minio.sh     Stop MinIO only"
 echo "  → bash scripts/stop_airflow.sh   Stop Airflow only"
 echo "  → bash scripts/stop_spark.sh     Stop Spark only"
+echo "  → bash scripts/stop_kafka.sh     Stop Kafka only"
 echo ""
 echo "  → bash scripts/stepXX.sh         Run Step XX (e.g. step01.sh, step02.sh)"
 echo "  → bash scripts/steps.sh          Show full steps dictionary"

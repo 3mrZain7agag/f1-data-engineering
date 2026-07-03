@@ -46,6 +46,12 @@ pip install great_expectations==0.18.19 -q || true
 echo "✅ Great Expectations installed"
 echo ""
 
+# ── Step 2.7: Install Kafka Python client ─────────────────
+echo "📨 Installing kafka-python-ng..."
+pip install kafka-python-ng==2.2.2 -q || true
+echo "✅ kafka-python-ng installed"
+echo ""
+
 # ── Step 3: Initialize Airflow ─────────────────────────────
 echo "⚙️  Initializing Airflow..."
 export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
