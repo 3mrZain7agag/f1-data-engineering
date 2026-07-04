@@ -30,6 +30,10 @@ fi
 echo "✅ Kafka is ready"
 echo ""
 
+echo "📋 Ensuring Kafka topic exists..."
+docker exec f1_kafka kafka-topics --bootstrap-server localhost:9092 --create --topic f1.lap_events --partitions 3 --replication-factor 1 --if-not-exists
+echo ""
+
 # ── Start the Streaming Consumer in the background ─────────
 echo "⚡ Starting Spark Streaming Consumer (background)..."
 nohup python -m streaming.consumer.spark_streaming_consumer > /tmp/f1_consumer.log 2>&1 &
