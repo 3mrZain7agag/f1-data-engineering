@@ -160,14 +160,19 @@ cat << 'EOF'
     bash scripts/step02.sh
     bash scripts/step04.sh
     bash scripts/step05.sh
+    bash scripts/step07.sh       (validate before Gold build)
     bash scripts/step06.sh
+    bash scripts/step08.sh       (Kafka streaming demo)
 
-  Or let Airflow handle 01, 02, 04 automatically:
+  Or let Airflow handle 01, 02, 04, 05, 07, 06 automatically:
     bash scripts/step03.sh
-    (then manually run step05.sh and step06.sh after)
+    (then manually run step08.sh for the streaming demo)
 
   Check status anytime:
     bash scripts/status.sh
+
+  Full reference for every step:
+    bash scripts/steps.sh
 
 ===================================================================
 
