@@ -242,3 +242,10 @@ dbt/f1_gold/target/
 dbt/f1_gold/logs/
 dbt/f1_gold/dbt_packages/
 derby.log
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl

@@ -30,6 +30,20 @@ fi
 echo "✅ Kafka is ready"
 echo ""
 
+echo "🧹 Cleaning old streaming checkpoint (avoids stale offset errors)..."
+python3 -c "
+import boto3
+from botocore.client import Config
+c = boto3.client('s3', endpoint_url='http://localhost:9000',
+    aws_access_key_id='f1minio', aws_secret_access_key='f1minio123',
+    config=Config(signature_version='s3v4'), region_name='us-east-1')
+objs = c.list_objects_v2(Bucket='f1-bronze', Prefix='_checkpoints/lap_events/')
+for obj in objs.get('Contents', []):
+    c.delete_object(Bucket='f1-bronze', Key=obj['Key'])
+print('Checkpoint cleaned')
+" 2>/dev/null
+echo ""
+
 echo "📋 Ensuring Kafka topic exists..."
 docker exec f1_kafka kafka-topics --bootstrap-server localhost:9092 --create --topic f1.lap_events --partitions 3 --replication-factor 1 --if-not-exists
 echo ""
