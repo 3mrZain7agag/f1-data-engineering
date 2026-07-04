@@ -41,7 +41,7 @@ A portfolio-grade, end-to-end Data Engineering platform that demonstrates master
 | 05 | PySpark Silver Layer | ✅ Complete | Apache Spark 3.5, Iceberg, Java 17 |
 | 06 | dbt Gold Layer | ✅ Complete | dbt-core, dbt-spark, Parquet |
 | 07 | Data Quality | ✅ Complete | Great Expectations |
-| 08 | Kafka Streaming | 🔲 Upcoming | Apache Kafka, Spark Streaming |
+| 08 | Kafka Streaming | ✅ Complete | Apache Kafka, Spark Structured Streaming |
 | 09 | FastF1 Telemetry | 🔲 Upcoming | FastF1, multi-source ingestion |
 | 10 | Cloud Migration (AWS) | 🔲 Upcoming | Terraform, S3, MSK, Glue, Redshift |
 | 11 | Power BI Dashboard | 🔲 Upcoming | Power BI, Redshift |
@@ -68,6 +68,11 @@ bash scripts/start.sh
 bash scripts/status.sh
 ```
 
+### Full Steps Reference
+```bash
+bash scripts/steps.sh
+```
+
 ### Run the Full Pipeline
 ```bash
 bash scripts/step03.sh   # Airflow: pull data + load warehouse
@@ -75,6 +80,7 @@ bash scripts/step04.sh   # Upload raw CSVs to Bronze (MinIO)
 bash scripts/step05.sh   # Transform Bronze → Silver (PySpark + Iceberg)
 bash scripts/step07.sh   # Validate Silver data quality (Great Expectations)
 bash scripts/step06.sh   # Transform Silver → Gold (dbt)
+bash scripts/step08.sh   # Kafka race replay + Spark Streaming consumer
 ```
 
 ### Save Your Work to GitHub
@@ -90,11 +96,13 @@ bash scripts/git_save.sh "your message here"
 
 | Script | Usage | Purpose |
 |--------|-------|---------|
-| `setup.sh` | `bash scripts/setup.sh` | Run **once** — installs everything (Java 17, Airflow, creates buckets) |
+| `setup.sh` | `bash scripts/setup.sh` | Run **once** — installs everything (Java 17, Airflow, dbt, GE, Kafka client, creates buckets) |
 | `start.sh` | `bash scripts/start.sh` | Start **all** services + git pull |
-| `stop.sh` | `bash scripts/stop.sh` | Stop **all** services |
-| `status.sh` | `bash scripts/status.sh` | Check all services + data summary |
-| `git_save.sh` | `bash scripts/git_save.sh "msg"` | Commit and push to GitHub |
+| `stop.sh` | `bash scripts/stop.sh` | Stop **all** services + streaming consumer |
+| `status.sh` | `bash scripts/status.sh` | Check status of all services + data summary |
+| `steps.sh` | `bash scripts/steps.sh` | Full reference dictionary — what each step does, prerequisites, how to run |
+| `view_gold.sh` | `bash scripts/view_gold.sh [season]` | Quick query of Gold layer analytics tables (defaults to 2024) |
+| `git_save.sh` | `bash scripts/git_save.sh "message"` | Commit and push to GitHub |
 
 ### 🐳 Individual Service Control
 
@@ -104,10 +112,12 @@ bash scripts/git_save.sh "your message here"
 | `start_minio.sh` | `bash scripts/start_minio.sh` | Start MinIO only |
 | `start_airflow.sh` | `bash scripts/start_airflow.sh` | Start Airflow webserver + scheduler |
 | `start_spark.sh` | `bash scripts/start_spark.sh` | Start Spark master + worker |
+| `start_kafka.sh` | `bash scripts/start_kafka.sh` | Start Kafka + Zookeeper + Kafka UI |
 | `stop_postgres.sh` | `bash scripts/stop_postgres.sh` | Stop PostgreSQL only |
 | `stop_minio.sh` | `bash scripts/stop_minio.sh` | Stop MinIO only |
 | `stop_airflow.sh` | `bash scripts/stop_airflow.sh` | Stop Airflow only |
 | `stop_spark.sh` | `bash scripts/stop_spark.sh` | Stop Spark only |
+| `stop_kafka.sh` | `bash scripts/stop_kafka.sh` | Stop Kafka + streaming consumer |
 
 ### 📊 Pipeline Steps
 
@@ -121,6 +131,7 @@ bash scripts/git_save.sh "your message here"
 | `step05.sh` | `bash scripts/step05.sh` | Transform Bronze → Silver (PySpark) |
 | `step06.sh` | `bash scripts/step06.sh` | Transform Silver → Gold (dbt) |
 | `step07.sh` | `bash scripts/step07.sh` | Validate Silver data quality (Great Expectations) |
+| `step08.sh` | `bash scripts/step08.sh [season] [round]` | Kafka race replay + Spark Streaming consumer |
 
 ### 📅 Daily Workflow
 ```
@@ -150,6 +161,10 @@ bash scripts/start_spark.sh
 # Silver bucket missing after restart?
 bash scripts/step05.sh  # recreates bucket automatically
 
+# dbt LOCATION_ALREADY_EXISTS error?
+rm -rf dbt/f1_gold/spark-warehouse dbt/f1_gold/target
+bash scripts/step06.sh  # cleans automatically now
+
 # Rate limit on API? Run seasons one by one
 bash scripts/step01.sh 2024
 sleep 120
@@ -157,6 +172,9 @@ bash scripts/step01.sh 2025
 
 # Force re-upload Bronze data
 python3 -c "from datalake.bronze.ingest_to_bronze import ingest_to_bronze; ingest_to_bronze(force=True)"
+
+# Kafka producer/consumer issues? Check logs
+tail -f /tmp/f1_consumer.log
 ```
 
 ---
@@ -189,6 +207,9 @@ bash scripts/step01.sh 2024        # single season
 - ✅ One season at a time with 2min sleep
 - ✅ Incremental loading (skips already downloaded data)
 - ✅ Structured JSON logging
+
+### Known limitation
+Jolpica API returns incomplete lap time data. Resolved in Step 09 with FastF1.
 
 ---
 
@@ -229,18 +250,26 @@ LIMIT 10;
 
 ### DAGs
 ```
-dag_ingest_f1          → Step 01: pulls data from API        (Mon 02:00 UTC)
-dag_ingest_to_bronze   → Step 04: uploads to MinIO Bronze    (Mon 03:00 UTC)
-dag_bronze_to_silver   → Step 05: PySpark Silver layer       (Mon 04:00 UTC)
-dag_load_warehouse     → Step 02: loads PostgreSQL DWH       (Mon 05:00 UTC)
+dag_ingest_f1          → Step 01: pulls data, one season at a time (Mon 02:00 UTC)
+dag_ingest_to_bronze   → Step 04: uploads to MinIO Bronze, force refresh (Mon 03:00 UTC)
+dag_bronze_to_silver   → Step 05: PySpark Silver layer (Mon 04:00 UTC)
+dag_data_quality       → Step 07: Great Expectations checks (Mon 04:30 UTC)
+dag_silver_to_gold     → Step 06: dbt Gold layer (Mon 05:00 UTC)
+dag_kafka_replay       → Step 08: streaming replay (manual trigger only)
 ```
 
 ### Run it
 ```bash
 bash scripts/start.sh
-bash scripts/step03.sh   # triggers + unpauses all 4 DAGs
+bash scripts/step03.sh     # triggers + unpauses all DAGs
 # Open port 8080 → admin / admin123
 ```
+
+### Key features
+- ✅ Six DAGs covering ingestion through streaming
+- ✅ Auto-unpause DAGs on trigger
+- ✅ Automatic retries on failure
+- ✅ REST API enabled for VS Code Airflow extension
 
 ---
 
@@ -249,43 +278,35 @@ bash scripts/step03.sh   # triggers + unpauses all 4 DAGs
 ### Bronze Layer Structure
 ```
 s3://f1-bronze/
-└── ergast/
-    ├── races/races.csv
-    ├── results/results.csv
-    ├── drivers/drivers.csv
-    ├── circuits/circuits.csv
-    ├── qualifying/qualifying.csv
-    ├── pit_stops/pit_stops.csv
-    └── lap_times/lap_times.csv
+├── ergast/
+│   ├── races/races.csv
+│   ├── drivers/drivers.csv
+│   ├── constructors/constructors.csv
+│   ├── circuits/circuits.csv
+│   ├── results/results.csv
+│   ├── qualifying/qualifying.csv
+│   ├── pit_stops/pit_stops.csv
+│   └── lap_times/lap_times.csv
+└── kafka/
+    └── lap_events/          ← streamed data from Step 08
 ```
 
 ### Run it
 ```bash
-bash scripts/step04.sh
-# MinIO UI → Open port 9001 → f1minio / f1minio123
+bash scripts/step04.sh          # incremental — skips existing files
 ```
+
+### Key features
+- ✅ MinIO running in Docker — identical API to AWS S3
+- ✅ `storage_client.py` — switches between MinIO and AWS S3 via single env var
+- ✅ Incremental uploads with force re-upload flag
 
 ---
 
 ## ✅ Step 05 — PySpark Silver Layer (Apache Iceberg)
 
 ### What it does
-Reads raw CSV files from Bronze, applies cleaning and type enforcement, and writes clean **Parquet files** as **Apache Iceberg tables** to the Silver layer in MinIO.
-
-### What is Apache Iceberg?
-Iceberg is a table format that sits on top of Parquet files in S3/MinIO. It adds ACID transactions, schema evolution, time travel, and upserts — making the Data Lake behave like a database.
-
-### Transformations Applied
-| Transformation | Applied To |
-|---------------|-----------|
-| Schema enforcement (correct types) | All tables |
-| Null standardization (`\N`, `""` → NULL) | All tables |
-| Deduplication on natural keys | All tables |
-| Lap time strings → milliseconds | lap_times, qualifying |
-| Pit stop duration → milliseconds | pit_stops |
-| Date strings → DateType | races, drivers |
-| DNF/DNS position → NULL | race_results |
-| Unrealistic lap times filtered | lap_times (< 50s or > 5min) |
+Reads raw CSV files from Bronze, applies cleaning and type enforcement, and writes clean **Parquet files** as **Apache Iceberg tables** to the Silver layer.
 
 ### Silver Tables
 | Table | Rows | Key Additions |
@@ -294,88 +315,41 @@ Iceberg is a table format that sits on top of Parquet files in S3/MinIO. It adds
 | silver.race_results | 4,698 | is_classified flag |
 | silver.drivers | 71 | date_of_birth (DateType) |
 | silver.circuits | 32 | lat/long (DoubleType) |
-| silver.qualifying | 4,684 | q1_ms, q2_ms, q3_ms (milliseconds) |
-| silver.pit_stops | 8,364 | duration_ms (milliseconds) |
-| silver.lap_times | 32,747 | lap_time_ms (milliseconds) |
+| silver.qualifying | 4,684 | q1_ms, q2_ms, q3_ms |
+| silver.pit_stops | 8,364 | duration_ms |
+| silver.lap_times | 32,747 | lap_time_ms |
 
 ### Run it
 ```bash
 bash scripts/step05.sh   # runs all 7 transformations + creates f1-silver bucket
 ```
 
-### Architecture
-```
-MinIO Bronze (raw CSV)
-       │
-       ▼  PySpark 3.5 + Apache Iceberg 1.5
-MinIO Silver (clean Parquet/Iceberg)
-       │
-  f1_catalog.silver.races
-  f1_catalog.silver.race_results
-  f1_catalog.silver.drivers
-  ...
-```
-
 ### Key features
 - ✅ Apache Spark 3.5.0 running in Docker
 - ✅ Java 17 (required — Java 25 is incompatible with Spark)
 - ✅ Apache Iceberg 1.5 with ACID transactions
-- ✅ Hadoop AWS + S3A connector for MinIO/S3 access
 - ✅ `spark_session.py` — reusable factory, switches MinIO ↔ AWS S3 via env var
-- ✅ `run_all_silver.py` — master runner for all 7 transformations
-- ✅ f1-silver bucket auto-created by step05.sh
 
 ### Lessons learned
 - Java 25 is incompatible with Spark 3.5 — must use Java 17
 - `JAVA_HOME` resets on Codespace restart — added to `start.sh` and `~/.bashrc`
-- CSV schema must match column order exactly when using StructType
-- Iceberg warehouse bucket must exist before Spark can write — auto-created in setup.sh
-
----
-
-
+- CSV schema must match column order exactly when using explicit StructType
 
 ---
 
 ## ✅ Step 06 — dbt Gold Layer
 
 ### What it does
-Reads Silver layer data and applies business logic — joins, aggregations, and
-Star Schema modeling — using **dbt** (data build tool). Produces analytics-ready
-Gold tables with built-in data quality tests.
-
-### What is dbt?
-dbt lets you write transformations as simple SQL SELECT statements. It handles
-table creation, dependency management (via `ref()`), testing, and documentation
-generation automatically.
+Reads Silver layer data and applies business logic — joins, aggregations, Star Schema modeling — using **dbt**. Produces analytics-ready Gold tables with built-in data quality tests.
 
 ### dbt Project Structure
 ```
 dbt/f1_gold/
-├── dbt_project.yml
 ├── models/
-│   ├── staging/              ← 1:1 views on Silver tables
-│   │   ├── stg_races.sql
-│   │   ├── stg_results.sql
-│   │   ├── stg_drivers.sql
-│   │   ├── stg_circuits.sql
-│   │   ├── stg_qualifying.sql
-│   │   ├── stg_pit_stops.sql
-│   │   └── stg_lap_times.sql
+│   ├── staging/              ← 1:1 views on Silver tables (7 models)
 │   └── marts/
-│       ├── core/              ← Star Schema fact + dim tables
-│       │   ├── dim_drivers.sql
-│       │   ├── dim_circuits.sql
-│       │   ├── dim_races.sql
-│       │   ├── fact_race_results.sql
-│       │   ├── fact_lap_times.sql
-│       │   ├── fact_pit_stops.sql
-│       │   └── schema.yml     ← tests + descriptions
-│       └── analytics/         ← Pre-aggregated reporting tables
-│           ├── agg_driver_season_stats.sql
-│           ├── agg_constructor_season_stats.sql
-│           ├── agg_circuit_stats.sql
-│           └── schema.yml
+│       ├── core/              ← Star Schema fact + dim tables (6 models)
+│       └── analytics/         ← Pre-aggregated reporting tables (3 models)
 ```
 
 ### Gold Tables
@@ -396,69 +370,41 @@ dbt/f1_gold/
 bash scripts/step06.sh   # runs dbt models + tests
 ```
 
+### View analytics output
+```bash
+bash scripts/view_gold.sh 2024
+```
+
 ### Verified accuracy
 - ✅ 2024 Drivers Champion: Verstappen (399 pts, 9 wins)
 - ✅ 2024 Constructors Champion: McLaren (609 pts, 6 wins)
 - ✅ Bahrain GP 2024 podium: Verstappen, Perez, Sainz
 
 ### Data Quality Tests
-18 dbt tests covering `not_null`, `unique` constraints across all dimension
-keys and critical fact columns — all passing.
-
-### Key features
-- ✅ dbt-core 1.11.11 + dbt-spark 1.10.3
-- ✅ 7 staging models, 6 core models, 3 analytics models
-- ✅ 18 automated data quality tests
-- ✅ Parquet file format (explicit `+file_format: parquet` config)
-- ✅ `dag_silver_to_gold` Airflow DAG with auto-clean before each run
-- ✅ Auto-configured `~/.dbt/profiles.yml` in setup.sh
+18 dbt tests — `not_null`, `unique` — all passing.
 
 ### Known limitation
-**Gold tables are stored locally** (`dbt/f1_gold/spark-warehouse/`), not in
-MinIO's `f1-gold` bucket. This is a known limitation of `dbt-spark`'s session
-method when combined with a custom Iceberg catalog — the Hive metastore and
-Iceberg catalog don't share state cleanly in local mode.
-
-This will be resolved naturally in **Step 10** when dbt connects directly to
-**AWS Redshift** instead of Spark — which is how dbt is used in the vast
-majority of production environments (dbt + Spark/Iceberg locally is primarily
-a learning exercise; dbt + cloud warehouse is the standard production pattern).
+**Gold tables are stored locally** (`dbt/f1_gold/spark-warehouse/`), not in MinIO. Known `dbt-spark` session-mode limitation with custom Iceberg catalogs. Resolved in **Step 10** when dbt connects directly to AWS Redshift.
 
 ### Lessons learned
-- dbt's `session` method with a custom Iceberg catalog has metastore conflicts
-- `LOCATION_ALREADY_EXISTS` errors require cleaning `spark-warehouse/` before re-runs
+- `LOCATION_ALREADY_EXISTS` errors require cleaning `spark-warehouse/` before every `--full-refresh` run
 - Default Hive table format isn't Parquet — must set `+file_format: parquet` explicitly
-- **Never commit `metastore_db/`, `spark-warehouse/`, or `target/` to git** — these are large, binary, constantly-changing files (197 files removed after initial mistake)
-
----
-
-
+- **Never commit `metastore_db/`, `spark-warehouse/`, or `target/` to git** (197 files removed after initial mistake)
 
 ---
 
 ## ✅ Step 07 — Data Quality (Great Expectations)
 
 ### What it does
-Validates the Silver layer against a set of automated data quality rules
-**before** dbt is allowed to build the Gold layer. Catches bad data early —
-right after PySpark transformation, not downstream in a dashboard.
+Validates the Silver layer against automated data quality rules **before** dbt builds the Gold layer.
 
-### Where It Sits in the Pipeline
+### Where It Sits
 ```
 Bronze → PySpark → Silver → [Great Expectations Checkpoint] → dbt → Gold
                                         │
-                                   ❌ FAIL → halt, alert
-                                   ✅ PASS → continue
+                                   FAIL → halt, alert
+                                   PASS → continue
 ```
-
-### What the Expectations Are Based On
-| Source | Example |
-|--------|---------|
-| F1 domain knowledge | `position` must be between 1-24 (max grid + margin) |
-| Schema requirements | `driver_id` must never be null (used as join key everywhere) |
-| Values already used in Step 05 | `lap_time_ms` between 50,000-300,000 (same filter used in `bronze_to_silver_laps.py`) |
-| Business logic | `points` must be between 0-26 (F1 scoring range) |
-| Uniqueness constraints | No duplicate `(season, round, driver_id)` combinations |
 
 ### Checkpoints Built
 | Table | Checks |
@@ -472,17 +418,65 @@ bash scripts/step07.sh
 ```
 
 ### Key features
-- ✅ Great Expectations 0.18.19
+- ✅ Great Expectations 0.18.19, ephemeral context mode
 - ✅ 10 automated checks across 2 Silver tables
-- ✅ `run_all_checks.py` — master runner with pass/fail summary
-- ✅ Exit code 1 on failure — can halt CI/CD or Airflow pipelines
 - ✅ `dag_data_quality` Airflow DAG — runs between Silver and Gold DAGs
 
+---
+
+## ✅ Step 08 — Kafka Streaming Layer
+
+### What it does
+Simulates a live F1 race by replaying historical lap data through **Apache Kafka**, consumed in near real-time by a **Spark Structured Streaming** job that writes micro-batches into Bronze.
+
+### Architecture
+```
+Silver (lap_times, Iceberg)
+       │
+       ▼  race_replay_producer.py
+Kafka Topic: f1.lap_events
+       │
+       ▼  spark_streaming_consumer.py (10s micro-batches)
+Bronze: s3://f1-bronze/kafka/lap_events/ (Parquet, streamed)
+```
+
+### What We Built
+| Component | File | Purpose |
+|-----------|------|---------|
+| Topic config | `streaming/producer/topic_config.py` | Central Kafka topic definitions |
+| Producer | `streaming/producer/race_replay_producer.py` | Reads Silver lap data, publishes to Kafka in lap order |
+| Consumer | `streaming/consumer/spark_streaming_consumer.py` | Spark Structured Streaming job reading Kafka → Bronze |
+
+### Kafka Stack (Docker)
+| Service | Port | Purpose |
+|---------|------|---------|
+| Zookeeper | 2181 | Kafka coordination |
+| Kafka | 9092 | Message broker |
+| Kafka UI | 8085 | Browse topics and messages |
+
+### Run it
+```bash
+bash scripts/step08.sh              # replays 2024 round 1 by default
+bash scripts/step08.sh 2023 5       # replay season 2023, round 5
+```
+
+### Verified end-to-end
+- 200 lap events published to Kafka in under 1 second
+- All 200 events consumed and written to Bronze as Parquet within ~13 seconds
+- Data integrity confirmed: Verstappen's Bahrain 2024 Lap 1 time (97.284s) intact through the full pipeline
+
+### Key features
+- ✅ Kafka + Zookeeper + Kafka UI running in Docker
+- ✅ Configurable replay speed (`--speed` flag; 50x default, 0 = instant)
+- ✅ Spark Structured Streaming with 10-second micro-batch trigger
+- ✅ `dag_kafka_replay` Airflow DAG — season/round configurable via Airflow Variables
+- ✅ Detached consumer process — survives after producer finishes
+
 ### Lessons learned
-- Silver layer column names come straight from the raw source schema
-  (`position`, not `finish_position` — that renaming happens later in dbt staging)
-- Great Expectations' `ephemeral` context mode works well for lightweight,
-  no-persistent-config validation — no need for a full GE project setup
+- `kafka-python` has a compatibility bug on newer Python versions (`kafka.vendor.six.moves` missing) — fixed by switching to the maintained fork `kafka-python-ng`
+- Spark Structured Streaming requires its own Kafka connector JAR (`spark-sql-kafka-0-10`), separate from the `kafka-python` producer library
+- `startingOffsets: earliest` lets the consumer pick up messages sent before it started
+- Long-running streaming consumers don't fit Airflow's task model well — best run as a detached background process
 
 ---
 
@@ -511,39 +505,57 @@ f1-data-engineering/
 │       ├── bronze_to_silver_pitstops.py
 │       ├── bronze_to_silver_laps.py
 │       └── run_all_silver.py     ← Master runner
+├── dbt/
+│   └── f1_gold/                  ← dbt project (staging + marts)
+├── quality/
+│   └── checkpoints/
+│       ├── validate_race_results.py
+│       ├── validate_lap_times.py
+│       └── run_all_checks.py     ← Master quality runner
+├── streaming/
+│   ├── producer/
+│   │   ├── topic_config.py
+│   │   └── race_replay_producer.py
+│   └── consumer/
+│       └── spark_streaming_consumer.py
 ├── orchestration/dags/
 │   ├── dag_ingest_f1.py
 │   ├── dag_load_warehouse.py
 │   ├── dag_ingest_to_bronze.py
-│   ├── dag_bronze_to_silver.py   ← Step 05: PySpark Silver DAG
-│   ├── dag_data_quality.py       ← Step 07: Great Expectations DAG
-│   └── dag_silver_to_gold.py     ← Step 06: dbt Gold DAG
+│   ├── dag_bronze_to_silver.py
+│   ├── dag_data_quality.py
+│   ├── dag_silver_to_gold.py
+│   └── dag_kafka_replay.py
 ├── scripts/
-│   ├── setup.sh                  ← First-time setup (8 steps)
+│   ├── setup.sh                  ← First-time setup
 │   ├── start.sh                  ← Start all services
 │   ├── stop.sh                   ← Stop all services
 │   ├── status.sh                 ← Service + data status dashboard
-│   ├── start_postgres.sh         ← PostgreSQL only
-│   ├── start_minio.sh            ← MinIO only
-│   ├── start_airflow.sh          ← Airflow only
-│   ├── start_spark.sh            ← Spark only
-│   ├── stop_postgres.sh          ← Stop PostgreSQL
-│   ├── stop_minio.sh             ← Stop MinIO
-│   ├── stop_airflow.sh           ← Stop Airflow
-│   ├── stop_spark.sh             ← Stop Spark
-│   ├── step01.sh                 ← Pull F1 data
-│   ├── step02.sh                 ← Load warehouse
-│   ├── step03.sh                 ← Trigger Airflow
-│   ├── step04.sh                 ← Upload to Bronze
-│   ├── step05.sh                 ← Bronze → Silver
-│   ├── step06.sh                 ← Silver → Gold (dbt)
-│   ├── step07.sh                 ← Data quality checkpoints
+│   ├── start_postgres.sh
+│   ├── start_minio.sh
+│   ├── start_airflow.sh
+│   ├── start_spark.sh
+│   ├── start_kafka.sh
+│   ├── stop_postgres.sh
+│   ├── stop_minio.sh
+│   ├── stop_airflow.sh
+│   ├── stop_spark.sh
+│   ├── stop_kafka.sh
+│   ├── step01.sh
+│   ├── step02.sh
+│   ├── step03.sh
+│   ├── step04.sh
+│   ├── step05.sh
+│   ├── step06.sh
+│   ├── step07.sh
+│   ├── step08.sh
 │   ├── steps.sh                  ← Steps reference dictionary
-│   └── git_save.sh               ← Save to GitHub
+│   ├── view_gold.sh
+│   └── git_save.sh
 ├── utils/
-│   └── logger.py                 ← JSON logging
+│   └── logger.py
 ├── docker/
-│   └── docker-compose.yml        ← PostgreSQL + MinIO + Spark
+│   └── docker-compose.yml        ← PostgreSQL + MinIO + Spark + Kafka
 ├── data/raw/                     ← gitignored
 ├── airflow/                      ← gitignored
 ├── requirements.txt
@@ -567,6 +579,8 @@ f1-data-engineering/
 | dbt-core | 1.11.11 | SQL transformation framework |
 | dbt-spark | 1.10.3 | dbt Spark adapter |
 | great_expectations | 0.18.19 | Data quality validation |
+| Apache Kafka | 7.6.0 (Confluent) | Streaming message broker |
+| kafka-python-ng | 2.2.2 | Python Kafka producer client |
 | PostgreSQL | 15 | Data Warehouse |
 | MinIO | Latest | Local S3-compatible storage |
 | Apache Airflow | 2.9.3 | Pipeline orchestration |
@@ -584,6 +598,8 @@ f1-data-engineering/
 | Airflow UI | 8080 | admin / admin123 |
 | Spark Master UI | 8082 | — |
 | Spark Connect | 7077 | — |
+| Kafka | 9092 | — |
+| Kafka UI | 8085 | — |
 
 ---
 
