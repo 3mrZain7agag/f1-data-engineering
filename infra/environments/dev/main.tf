@@ -42,6 +42,17 @@ module "s3" {
   environment  = var.environment
 }
 
+# ── IAM Roles ───────────────────────────────────────────────
+module "iam" {
+  source            = "../../modules/iam"
+  project_name      = var.project_name
+  environment       = var.environment
+  bronze_bucket_arn = module.s3.bronze_bucket_arn
+  silver_bucket_arn = module.s3.silver_bucket_arn
+  gold_bucket_arn   = module.s3.gold_bucket_arn
+  logs_bucket_arn   = module.s3.logs_bucket_arn
+}
+
 # ── Outputs ─────────────────────────────────────────────────
 output "bronze_bucket" {
   value = module.s3.bronze_bucket_name
@@ -57,4 +68,12 @@ output "gold_bucket" {
 
 output "logs_bucket" {
   value = module.s3.logs_bucket_name
+}
+
+output "glue_role_arn" {
+  value = module.iam.glue_role_arn
+}
+
+output "redshift_role_arn" {
+  value = module.iam.redshift_role_arn
 }
