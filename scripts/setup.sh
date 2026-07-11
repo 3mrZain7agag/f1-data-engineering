@@ -52,6 +52,12 @@ pip install kafka-python-ng==2.2.2 -q || true
 echo "✅ kafka-python-ng installed"
 echo ""
 
+# ── Step 2.8: Pin typing_extensions (fixes Airflow/pydantic conflict) ──
+echo "🔧 Fixing typing_extensions version conflict..."
+pip install "typing_extensions==4.16.0" --no-deps --force-reinstall -q --break-system-packages
+echo "✅ typing_extensions pinned"
+echo ""
+
 # ── Step 3: Initialize Airflow ─────────────────────────────
 echo "⚙️  Initializing Airflow..."
 export AIRFLOW_HOME=/workspaces/f1-data-engineering/airflow
