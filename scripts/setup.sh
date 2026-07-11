@@ -119,7 +119,14 @@ echo ""
 
 # ── Step 5: Wait for services to be ready ─────────────────
 echo "⏳ Waiting for services to be ready..."
-sleep 6
+for i in {1..30}; do
+    if docker exec f1_postgres pg_isready -U f1user -d f1_warehouse > /dev/null 2>&1; then
+        echo "  Postgres is ready"
+        break
+    fi
+    echo "  Waiting for Postgres... ($i/30)"
+    sleep 2
+done
 
 # ── Step 6: Create database schema ────────────────────────
 echo "🏗️  Creating Star Schema tables..."
