@@ -1,7 +1,7 @@
 # 🏎️ F1 Data Engineering Platform
 
 > **End-to-end Data Engineering project built around Formula 1 racing data.**
-> From a simple Python ETL script to a full cloud-native streaming platform — built incrementally, one step at a time.
+> From a simple Python ETL script to a fully containerized streaming and analytics platform — built incrementally, one step at a time.
 
 ---
 
@@ -22,7 +22,6 @@ A portfolio-grade, end-to-end Data Engineering platform that demonstrates master
 - Data Lake architecture (Bronze / Silver / Gold)
 - Distributed processing (Apache Spark)
 - Streaming architecture (Apache Kafka)
-- Cloud deployment (AWS S3, MSK, Glue, Redshift)
 - Data quality (Great Expectations)
 - Transformations (dbt)
 - Machine Learning (scikit-learn + MLflow)
@@ -42,10 +41,8 @@ A portfolio-grade, end-to-end Data Engineering platform that demonstrates master
 | 06 | dbt Gold Layer | ✅ Complete | dbt-core, dbt-spark, Parquet |
 | 07 | Data Quality | ✅ Complete | Great Expectations |
 | 08 | Kafka Streaming | ✅ Complete | Apache Kafka, Spark Structured Streaming |
-| 09 | FastF1 Telemetry | 🔲 Upcoming | FastF1, multi-source ingestion |
-| 10 | Cloud Migration (AWS) | 🔲 Upcoming | Terraform, S3, MSK, Glue, Redshift |
-| 11 | Power BI Dashboard | 🔲 Upcoming | Power BI, Redshift |
-| 12 | Machine Learning | 🔲 Upcoming | scikit-learn, MLflow, XGBoost |
+| 09 | Power BI Dashboard | 🔲 Upcoming | Power BI |
+| 10 | Machine Learning | 🔲 Upcoming | scikit-learn, MLflow, XGBoost |
 
 ---
 
@@ -209,7 +206,7 @@ bash scripts/step01.sh 2024        # single season
 - ✅ Structured JSON logging
 
 ### Known limitation
-Jolpica API returns incomplete lap time data. Resolved in Step 09 with FastF1.
+Jolpica API returns incomplete lap time data for some seasons.
 
 ---
 
@@ -384,7 +381,7 @@ bash scripts/view_gold.sh 2024
 18 dbt tests — `not_null`, `unique` — all passing.
 
 ### Known limitation
-**Gold tables are stored locally** (`dbt/f1_gold/spark-warehouse/`), not in MinIO. Known `dbt-spark` session-mode limitation with custom Iceberg catalogs. Resolved in **Step 10** when dbt connects directly to AWS Redshift.
+**Gold tables are stored locally** (`dbt/f1_gold/spark-warehouse/`), not in MinIO. This is a known `dbt-spark` session-mode limitation with custom Iceberg catalogs.
 
 ### Lessons learned
 - `LOCATION_ALREADY_EXISTS` errors require cleaning `spark-warehouse/` before every `--full-refresh` run
