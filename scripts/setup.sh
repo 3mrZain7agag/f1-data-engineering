@@ -126,11 +126,11 @@ echo ""
 # ── Step 5: Wait for services to be ready ─────────────────
 echo "⏳ Waiting for services to be ready..."
 for i in {1..30}; do
-    if docker exec f1_postgres pg_isready -U f1user -d f1_warehouse > /dev/null 2>&1; then
-        echo "  Postgres is ready"
+    if docker exec f1_postgres psql -U f1user -d f1_warehouse -c "SELECT 1" > /dev/null 2>&1; then
+        echo "  Postgres and f1_warehouse database are ready"
         break
     fi
-    echo "  Waiting for Postgres... ($i/30)"
+    echo "  Waiting for f1_warehouse database... ($i/30)"
     sleep 2
 done
 
