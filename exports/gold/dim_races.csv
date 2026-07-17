@@ -232,3 +232,25 @@ race_id,season,round,race_name,circuit_id,country,race_date,race_year,race_month
 2025_22,2025,22,Las Vegas Grand Prix,vegas,USA,2025-11-23,2025,11
 2025_23,2025,23,Qatar Grand Prix,losail,Qatar,2025-11-30,2025,11
 2025_24,2025,24,Abu Dhabi Grand Prix,yas_marina,UAE,2025-12-07,2025,12
+2026_01,2026,1,Australian Grand Prix,albert_park,Australia,2026-03-08,2026,3
+2026_02,2026,2,Chinese Grand Prix,shanghai,China,2026-03-15,2026,3
+2026_03,2026,3,Japanese Grand Prix,suzuka,Japan,2026-03-29,2026,3
+2026_04,2026,4,Miami Grand Prix,miami,USA,2026-05-03,2026,5
+2026_05,2026,5,Canadian Grand Prix,villeneuve,Canada,2026-05-24,2026,5
+2026_06,2026,6,Monaco Grand Prix,monaco,Monaco,2026-06-07,2026,6
+2026_07,2026,7,Barcelona Grand Prix,catalunya,Spain,2026-06-14,2026,6
+2026_08,2026,8,Austrian Grand Prix,red_bull_ring,Austria,2026-06-28,2026,6
+2026_09,2026,9,British Grand Prix,silverstone,UK,2026-07-05,2026,7
+2026_10,2026,10,Belgian Grand Prix,spa,Belgium,2026-07-19,2026,7
+2026_11,2026,11,Hungarian Grand Prix,hungaroring,Hungary,2026-07-26,2026,7
+2026_12,2026,12,Dutch Grand Prix,zandvoort,Netherlands,2026-08-23,2026,8
+2026_13,2026,13,Italian Grand Prix,monza,Italy,2026-09-06,2026,9
+2026_14,2026,14,Spanish Grand Prix,madring,Spain,2026-09-13,2026,9
+2026_15,2026,15,Azerbaijan Grand Prix,baku,Azerbaijan,2026-09-26,2026,9
+2026_16,2026,16,Singapore Grand Prix,marina_bay,Singapore,2026-10-11,2026,10
+2026_17,2026,17,United States Grand Prix,americas,USA,2026-10-25,2026,10
+2026_18,2026,18,Mexico City Grand Prix,rodriguez,Mexico,2026-11-01,2026,11
+2026_19,2026,19,Brazilian Grand Prix,interlagos,Brazil,2026-11-08,2026,11
+2026_20,2026,20,Las Vegas Grand Prix,vegas,USA,2026-11-22,2026,11
+2026_21,2026,21,Qatar Grand Prix,losail,Qatar,2026-11-29,2026,11
+2026_22,2026,22,Abu Dhabi Grand Prix,yas_marina,UAE,2026-12-06,2026,12

@@ -41,7 +41,7 @@ A portfolio-grade, end-to-end Data Engineering platform that demonstrates master
 | 06 | dbt Gold Layer | ✅ Complete | dbt-core, dbt-spark, Parquet |
 | 07 | Data Quality | ✅ Complete | Great Expectations |
 | 08 | Kafka Streaming | ✅ Complete | Apache Kafka, Spark Structured Streaming |
-| 09 | Power BI Dashboard | 🔲 Upcoming | Power BI |
+| 09 | Power BI Dashboard | ✅ Complete | Power BI |
 | 10 | Machine Learning | 🔲 Upcoming | scikit-learn, MLflow, XGBoost |
 
 ---
@@ -477,6 +477,49 @@ bash scripts/step08.sh 2023 5       # replay season 2023, round 5
 
 ---
 
+## ✅ Step 09 — Power BI Dashboard
+
+### What it does
+Exports the Gold layer analytics tables and builds an interactive 3-page Power BI dashboard with a custom dark F1 theme, cross-filtering, and cross-page navigation.
+
+### Dashboard Pages
+| Page | Contents |
+|------|----------|
+| Overview | KPI cards (races, drivers, constructors, seasons), championship points trend, worldwide Grand Prix map with hover tooltips |
+| Driver & Constructor Performance | Top 10 wins by driver, season slicer, cumulative championship points race, constructor performance table |
+| Circuit Analysis | Fastest lap records by circuit, circuit history table (total races, seasons held, avg lap time) |
+
+### Export pipeline
+```bash
+python export/export_gold_to_csv.py   # dbt show --output json → CSV, per Gold table
+```
+
+> Exports shell out to `dbt show` rather than opening an independent Spark session, since `dbt-spark`'s session-mode Derby metastore is only safely accessible from dbt's own process.
+
+### Key features
+- ✅ All 9 Gold tables loaded into a Power BI star schema model
+- ✅ Custom dark F1 theme (page-level background styling to avoid Filters pane rendering issues)
+- ✅ Top N filtering on driver wins chart, right-aligned numeric tables
+- ✅ Cross-page navigation via custom icon buttons
+- ✅ Map tooltips showing circuit, country, and race count on hover
+
+### Preview
+![Overview page](docs/PowerBI/overview.png)
+![Driver & Constructor Performance](docs/PowerBI/driver_constructor.png)
+![Circuit Analysis](docs/PowerBI/circuit_analysis.png)
+
+🎥 [Watch the full demo video](docs/PowerBI/F1_Power_demo.mp4)
+
+### Lessons learned
+- `dbt show --output json` is a reliable way to pull Gold layer data into Power BI without fighting Spark session conflicts
+- Power BI theme JSON: report-level `background`/`foreground` keys break the Filters pane — background styling must live inside `visualStyles` at the page level
+- Top N filters must reference the same field as the visual's value (not a different metric), or the filter silently doesn't reduce visual clutter as expected
+
+### Icon credits
+Dashboard icons sourced from [Flaticon](https://www.flaticon.com/). One icon set requires attribution per its license terms.
+
+---
+
 ## 🗂️ Project Structure
 
 ```
@@ -515,6 +558,10 @@ f1-data-engineering/
 │   │   └── race_replay_producer.py
 │   └── consumer/
 │       └── spark_streaming_consumer.py
+├── export/
+│   └── export_gold_to_csv.py     ← Gold layer → CSV for Power BI
+├── docs/
+│   └── screenshots/               ← Power BI dashboard screenshots
 ├── orchestration/dags/
 │   ├── dag_ingest_f1.py
 │   ├── dag_load_warehouse.py
@@ -582,6 +629,7 @@ f1-data-engineering/
 | MinIO | Latest | Local S3-compatible storage |
 | Apache Airflow | 2.9.3 | Pipeline orchestration |
 | Docker Compose | 2.40 | Local service management |
+| Power BI Desktop | Latest | Dashboarding and analytics |
 
 ---
 
