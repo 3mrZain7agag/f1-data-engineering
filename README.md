@@ -78,6 +78,7 @@ bash scripts/step05.sh   # Transform Bronze → Silver (PySpark + Iceberg)
 bash scripts/step07.sh   # Validate Silver data quality (Great Expectations)
 bash scripts/step06.sh   # Transform Silver → Gold (dbt)
 bash scripts/step08.sh   # Kafka race replay + Spark Streaming consumer
+bash scripts/step09.sh   # Export Gold layer to CSV for Power BI
 ```
 
 ### Save Your Work to GitHub
@@ -129,6 +130,7 @@ bash scripts/git_save.sh "your message here"
 | `step06.sh` | `bash scripts/step06.sh` | Transform Silver → Gold (dbt) |
 | `step07.sh` | `bash scripts/step07.sh` | Validate Silver data quality (Great Expectations) |
 | `step08.sh` | `bash scripts/step08.sh [season] [round]` | Kafka race replay + Spark Streaming consumer |
+| `step09.sh` | `bash scripts/step09.sh` | Export Gold layer tables to CSV (`exports/gold/`) for Power BI |
 
 ### 📅 Daily Workflow
 ```
@@ -347,6 +349,10 @@ dbt/f1_gold/
 │   └── marts/
 │       ├── core/              ← Star Schema fact + dim tables (6 models)
 │       └── analytics/         ← Pre-aggregated reporting tables (3 models)
+├── seeds/                     ← static reference data
+├── snapshots/                 ← (reserved, not yet used)
+├── analyses/                  ← (reserved, not yet used)
+└── tests/                     ← custom test definitions
 ```
 
 ### Gold Tables
@@ -386,7 +392,7 @@ bash scripts/view_gold.sh 2024
 ### Lessons learned
 - `LOCATION_ALREADY_EXISTS` errors require cleaning `spark-warehouse/` before every `--full-refresh` run
 - Default Hive table format isn't Parquet — must set `+file_format: parquet` explicitly
-- **Never commit `metastore_db/`, `spark-warehouse/`, or `target/` to git** (197 files removed after initial mistake)
+- **Never commit `metastore_db/`, `spark-warehouse/`, `logs/`, `target/`, or `__pycache__/` to git** (197 files removed after initial mistake) — worth periodically re-checking `.gitignore` coverage, since these directories can silently reappear after a `dbt` run
 
 ---
 
@@ -491,10 +497,10 @@ Exports the Gold layer analytics tables and builds an interactive 3-page Power B
 
 ### Export pipeline
 ```bash
-python export/export_gold_to_csv.py   # dbt show --output json → CSV, per Gold table
+bash scripts/step09.sh                 # wraps: python export/export_gold_to_csv.py
 ```
 
-> Exports shell out to `dbt show` rather than opening an independent Spark session, since `dbt-spark`'s session-mode Derby metastore is only safely accessible from dbt's own process.
+> Exports shell out to `dbt show` rather than opening an independent Spark session, since `dbt-spark`'s session-mode Derby metastore is only safely accessible from dbt's own process. Output CSVs land in `exports/gold/`, one file per Gold table, which is what Power BI connects to.
 
 ### Key features
 - ✅ All 9 Gold tables loaded into a Power BI star schema model
@@ -510,10 +516,9 @@ python export/export_gold_to_csv.py   # dbt show --output json → CSV, per Gold
 
 ![Circuit Analysis](docs/PowerBI/circuit_analysis.png)
 
-🎥 [Watch the full demo](docs/PowerBI/F1_Power_demo.mp4)
+🎥 [Watch the full demo video](docs/PowerBI/F1_Power_demo.mp4)
 
 https://github.com/user-attachments/assets/2317fd81-3cf5-448c-85fd-0659d45d635d
-
 
 ### Lessons learned
 - `dbt show --output json` is a reliable way to pull Gold layer data into Power BI without fighting Spark session conflicts
@@ -551,7 +556,7 @@ f1-data-engineering/
 │       ├── bronze_to_silver_laps.py
 │       └── run_all_silver.py     ← Master runner
 ├── dbt/
-│   └── f1_gold/                  ← dbt project (staging + marts)
+│   └── f1_gold/                  ← dbt project (staging + marts, seeds, snapshots, tests)
 ├── quality/
 │   └── checkpoints/
 │       ├── validate_race_results.py
@@ -564,9 +569,16 @@ f1-data-engineering/
 │   └── consumer/
 │       └── spark_streaming_consumer.py
 ├── export/
-│   └── export_gold_to_csv.py     ← Gold layer → CSV for Power BI
+│   └── export_gold_to_csv.py     ← Gold layer → CSV, for Power BI
+├── exports/
+│   └── gold/                     ← CSV output from export_gold_to_csv.py (9 Gold tables)
+├── infra/
+│   ├── environments/dev/main.tf  ← Terraform env config (AWS infra currently torn down)
+│   └── modules/
+│       ├── iam/main.tf
+│       └── s3/main.tf
 ├── docs/
-│   └── screenshots/               ← Power BI dashboard screenshots
+│   └── PowerBI/                  ← Dashboard screenshots + demo video
 ├── orchestration/dags/
 │   ├── dag_ingest_f1.py
 │   ├── dag_load_warehouse.py
@@ -598,6 +610,7 @@ f1-data-engineering/
 │   ├── step06.sh
 │   ├── step07.sh
 │   ├── step08.sh
+│   ├── step09.sh
 │   ├── steps.sh                  ← Steps reference dictionary
 │   ├── view_gold.sh
 │   └── git_save.sh
@@ -634,6 +647,7 @@ f1-data-engineering/
 | MinIO | Latest | Local S3-compatible storage |
 | Apache Airflow | 2.9.3 | Pipeline orchestration |
 | Docker Compose | 2.40 | Local service management |
+| Terraform | Latest | AWS infra as code (currently torn down; modules retained for reference) |
 | Power BI Desktop | Latest | Dashboarding and analytics |
 
 ---
