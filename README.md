@@ -505,10 +505,15 @@ python export/export_gold_to_csv.py   # dbt show --output json → CSV, per Gold
 
 ### Preview
 ![Overview page](docs/PowerBI/overview.png)
+
 ![Driver & Constructor Performance](docs/PowerBI/driver_constructor.png)
+
 ![Circuit Analysis](docs/PowerBI/circuit_analysis.png)
 
-🎥 [Watch the full demo video](docs/PowerBI/F1_Power_demo.mp4)
+🎥 [Watch the full demo](docs/PowerBI/F1_Power_demo.mp4)
+
+https://github.com/user-attachments/assets/2317fd81-3cf5-448c-85fd-0659d45d635d
+
 
 ### Lessons learned
 - `dbt show --output json` is a reliable way to pull Gold layer data into Power BI without fighting Spark session conflicts
