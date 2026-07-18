@@ -16,21 +16,37 @@ Requires: scikit-learn, xgboost, mlflow (add to requirements.txt)
 
 import argparse
 import os
-import joblib
-import pandas as pd
-import mlflow
-import mlflow.sklearn
-import mlflow.xgboost
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
-from xgboost import XGBClassifier
+import sys
+
+try:
+    import joblib
+    import pandas as pd
+    import mlflow
+    import mlflow.sklearn
+    import mlflow.xgboost
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.pipeline import make_pipeline
+    from sklearn.metrics import (
+        accuracy_score,
+        precision_score,
+        recall_score,
+        roc_auc_score,
+    )
+    from xgboost import XGBClassifier
+except ModuleNotFoundError as e:
+    sys.exit(
+        f"Missing dependency: {e.name}\n\n"
+        "This script needs the isolated ML virtual environment, not the "
+        "global Python environment. Either:\n"
+        "  1. Run it via the wrapper script (recommended):\n"
+        "     bash scripts/step10.sh\n"
+        "  2. Or activate the venv yourself first:\n"
+        "     source .venv-ml/bin/activate\n"
+        "     python -m ml.train.train_model --target ...\n\n"
+        "If .venv-ml doesn't exist yet, run 'bash scripts/step10.sh' once "
+        "to set it up and install dependencies."
+    )
 
 from ml.features.build_features import FEATURE_COLS
 

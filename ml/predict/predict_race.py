@@ -22,8 +22,24 @@ Run:
 
 import argparse
 import os
-import joblib
-import pandas as pd
+import sys
+
+try:
+    import joblib
+    import pandas as pd
+except ModuleNotFoundError as e:
+    sys.exit(
+        f"Missing dependency: {e.name}\n\n"
+        "This script needs the isolated ML virtual environment, not the "
+        "global Python environment. Either:\n"
+        "  1. Run it via the wrapper script (recommended):\n"
+        "     bash scripts/predict_race.sh --race-id ... --target ...\n"
+        "  2. Or activate the venv yourself first:\n"
+        "     source .venv-ml/bin/activate\n"
+        "     python -m ml.predict.predict_race ...\n\n"
+        "If .venv-ml doesn't exist yet, run 'bash scripts/step10.sh' once "
+        "to set it up and train the models."
+    )
 
 from ml.features.build_features import load_gold_tables, engineer_all, FEATURE_COLS
 

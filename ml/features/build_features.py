@@ -20,7 +20,20 @@ Output:
 """
 
 import os
-import pandas as pd
+import sys
+
+try:
+    import pandas as pd
+except ModuleNotFoundError as e:
+    sys.exit(
+        f"Missing dependency: {e.name}\n\n"
+        "This script needs the isolated ML virtual environment, not the "
+        "global Python environment.\n"
+        "  source .venv-ml/bin/activate\n"
+        "  python -m ml.features.build_features\n\n"
+        "If .venv-ml doesn't exist yet, run 'bash scripts/step10.sh' once "
+        "to set it up."
+    )
 
 GOLD_DIR = "exports/gold"
 OUTPUT_DIR = "ml/data"
