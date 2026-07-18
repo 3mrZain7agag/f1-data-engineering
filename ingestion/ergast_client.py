@@ -23,7 +23,7 @@ from utils.logger import get_logger
 log = get_logger(__name__)
 
 BASE_URL = "https://api.jolpi.ca/ergast/f1"
-DEFAULT_LIMIT = 1000          # max rows per page
+DEFAULT_LIMIT = 1000          # max rows per page (season-level / lap-level endpoints)
 REQUEST_DELAY = 1.0           # seconds between requests (~1 req/s)
 
 
@@ -91,9 +91,15 @@ class ErgastClient:
         return self._get_all(f"{season}", ["RaceTable", "Races"])
 
     def get_results(self, season: int, round_num: int) -> list[dict]:
+        # NOTE: no `limit` param here on purpose. A single race never has
+        # more than ~24 results, so pagination is never needed — and
+        # Jolpica appears to return a stale/empty cached response when an
+        # explicit large `limit` (e.g. 1000) is sent for very recent races,
+        # even though the same URL without `limit` returns correct data.
+        # See: Step 01 lesson learned in README.
         data = self._get(
             f"{self.base_url}/{season}/{round_num}/results.json",
-            {"limit": DEFAULT_LIMIT}
+            {}
         )
         races = data.get("MRData", {}).get("RaceTable", {}).get("Races", [])
         return races[0].get("Results", []) if races else []
@@ -131,17 +137,21 @@ class ErgastClient:
         return laps
 
     def get_pit_stops(self, season: int, round_num: int) -> list[dict]:
+        # NOTE: no `limit` param — see get_results() docstring note above.
         data = self._get(
             f"{self.base_url}/{season}/{round_num}/pitstops.json",
-            {"limit": DEFAULT_LIMIT}
+            {}
         )
         races = data.get("MRData", {}).get("RaceTable", {}).get("Races", [])
         return races[0].get("PitStops", []) if races else []
 
     def get_qualifying(self, season: int, round_num: int) -> list[dict]:
+        # NOTE: no `limit` param — see get_results() docstring note above.
+        # This was the actual root cause of qualifying data for recent
+        # races silently coming back empty (Step 01 lesson learned).
         data = self._get(
             f"{self.base_url}/{season}/{round_num}/qualifying.json",
-            {"limit": DEFAULT_LIMIT}
+            {}
         )
         races = data.get("MRData", {}).get("RaceTable", {}).get("Races", [])
         return races[0].get("QualifyingResults", []) if races else []

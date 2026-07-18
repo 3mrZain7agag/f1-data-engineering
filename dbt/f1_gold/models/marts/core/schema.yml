@@ -16,8 +16,11 @@ models:
         tests:
           - not_null
       - name: points
+        description: "Points scored. NULL for races that have qualifying data but haven't been run yet — see the FULL OUTER JOIN note in fact_race_results.sql. The not_null test below is scoped to only rows where finish_position is set, i.e. the race has actually happened."
         tests:
-          - not_null
+          - not_null:
+              config:
+                where: "finish_position is not null"
 
   - name: dim_drivers
     description: "Driver dimension table"

@@ -86,11 +86,27 @@ def predict_for_race(target_race, all_features: pd.DataFrame, target: str, model
         )
         return
 
-    # Rows missing grid/qualifying position can't be scored yet
+    # A race with only qualifying done yet (no grid confirmed) will have
+    # grid_position as NaN, even though qualifying_position is set — grid
+    # positions are only finalized close to race day, after any penalties.
+    # Fall back to qualifying_position as the best available estimate of
+    # grid position in that case (grid_penalty_positions becomes 0 for
+    # those rows, i.e. "assume no penalty until we know otherwise").
+    race_rows = race_rows.copy()
+    using_quali_fallback = race_rows["grid_position"].isna() & race_rows["qualifying_position"].notna()
+    race_rows.loc[using_quali_fallback, "grid_position"] = race_rows.loc[using_quali_fallback, "qualifying_position"]
+    race_rows.loc[using_quali_fallback, "grid_penalty_positions"] = 0
+
+    # Rows still missing qualifying position can't be scored at all
     scoreable = race_rows.dropna(subset=["grid_position", "qualifying_position"])
     missing = len(race_rows) - len(scoreable)
     if missing:
         print(f"Note: {missing} driver(s) missing grid/qualifying data, skipped.")
+    if using_quali_fallback.any():
+        print(
+            f"Note: {using_quali_fallback.sum()} driver(s) have no confirmed grid "
+            "position yet (pre-penalty) — using qualifying position as an estimate."
+        )
 
     if scoreable.empty:
         print("No drivers have grid/qualifying data yet for this race.")

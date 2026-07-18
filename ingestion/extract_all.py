@@ -1,7 +1,7 @@
 """
 F1 ETL — Step 01
 ----------------
-Extracts historical F1 data from the Ergast API for seasons 2015–2024
+Extracts historical F1 data from the Ergast API for seasons 2015–2026
 and saves it as CSV files + an SQLite database in data/raw/.
 
 Usage:
@@ -23,7 +23,7 @@ from utils.logger import get_logger
 log      = get_logger(__name__)
 RAW_DIR  = Path("data/raw")
 DB_PATH  = RAW_DIR / "f1.db"
-SEASONS  = list(range(2015, 2025))   # 2015 → 2024 inclusive
+SEASONS  = list(range(2015, 2027))   # 2015 → 2026 inclusive
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--seasons", nargs="+", type=int,
         default=SEASONS,
-        help="Seasons to fetch (default: 2015–2024)"
+        help="Seasons to fetch (default: 2015–2026)"
     )
     args = parser.parse_args()
     main(args.seasons)
