@@ -1,0 +1,23 @@
+# ML dependencies for Step 10 — Machine Learning
+#
+# IMPORTANT: install these into a dedicated virtual environment (.venv-ml),
+# NOT into the main project environment. mlflow pulls in protobuf<7, which
+# conflicts with dbt-core/dbt-common/dbt-adapters (all require protobuf>=6.0
+# and, separately, opentelemetry-proto requires protobuf<5.0). Mixing these
+# into one environment creates an unresolvable three-way version conflict.
+#
+# Setup:
+#   python3 -m venv .venv-ml
+#   source .venv-ml/bin/activate
+#   pip install -r ml/requirements-ml.txt
+#
+# Usage:
+#   source .venv-ml/bin/activate
+#   bash scripts/step10.sh
+#   deactivate
+
+pandas==2.3.3
+scikit-learn==1.9.0
+xgboost==3.3.0
+mlflow==3.14.0
+joblib==1.5.3

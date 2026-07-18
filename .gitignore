@@ -249,3 +249,11 @@ derby.log
 *.tfstate.*
 *.tfvars
 .terraform.lock.hcl
+.venv-ml/
+ml/models/*.joblib
+
+# Step 10 - ML
+.venv-ml/
+ml/models/*.joblib
+mlruns/
+mlflow.db
