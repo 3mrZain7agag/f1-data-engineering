@@ -28,8 +28,12 @@ echo "  Refreshing pipeline: Bronze → Silver → Quality → Gold → Export"
 echo "=================================================="
 echo ""
 
-echo "── Step 04: Bronze ──────────────────────────────"
-bash scripts/step04.sh
+echo "── Step 04: Bronze (force re-upload) ────────────"
+echo "Note: using force=True instead of step04.sh's default incremental"
+echo "upload, since incremental mode skips files that already exist —"
+echo "even if their content changed (e.g. a race gaining results after"
+echo "previously only having qualifying data). See README lessons learned."
+python3 -c "from datalake.bronze.ingest_to_bronze import ingest_to_bronze; ingest_to_bronze(force=True)"
 
 echo ""
 echo "── Step 05: Silver ──────────────────────────────"
