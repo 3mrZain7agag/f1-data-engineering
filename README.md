@@ -6,8 +6,7 @@
 ---
 
 ## 👤 Author
-<img align="right" width="150" alt="Amr Hagag" src="https://github.com/user-attachments/assets/700627ac-a9e7-4bb3-a77c-4c1504289a56" />
-
+[<img align="right" width="150" alt="Amr Hagag" src="https://github.com/user-attachments/assets/700627ac-a9e7-4bb3-a77c-4c1504289a56" />](https://linkedin.com/in/amrhagag-dataeng)
 **Amr Hagag** — Data Engineering Student & DEPI Trainee
 - 📧 amr.hagag.prof@gmail.com
 
