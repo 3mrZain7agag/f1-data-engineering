@@ -90,7 +90,7 @@ def load_model(target: str, model_name: str):
     return joblib.load(path)
 
 
-def predict_for_race(target_race, all_features: pd.DataFrame, target: str, model_name: str, top_n: int = 3):
+def predict_for_race(target_race, all_features: pd.DataFrame, target: str, model_name: str, top_n: int | None = None):
     race_rows = all_features[all_features["race_id"] == target_race["race_id"]].copy()
 
     if race_rows.empty:
@@ -142,33 +142,40 @@ def predict_for_race(target_race, all_features: pd.DataFrame, target: str, model
     # a result instead, and only score accuracy on drivers who do.
     has_actual = scoreable["finish_position"].notna().any()
 
-    display_cols = ["driver_id", "grid_position", "qualifying_position", "predicted_prob", "predicted_label"]
     ranked = scoreable.sort_values("predicted_prob", ascending=False)
-    top_rows = ranked.head(top_n)
+    effective_n = len(ranked) if top_n is None else min(top_n, len(ranked))
+    top_rows = ranked.head(effective_n)
 
     print(f"\n=== Race: {target_race.get('race_name', target_race['race_id'])} "
           f"({target_race['race_date'].date()}) ===")
     print(f"Target: {target} | Model: {model_name}\n")
 
-    if top_n <= 3:
-        podium_labels = ["🥇 P1", "🥈 P2", "🥉 P3"]
-        for rank, (_, row) in enumerate(top_rows.iterrows()):
-            label = podium_labels[rank] if rank < 3 else f"P{rank + 1}"
-            actual_str = ""
-            if has_actual:
-                fp = row["finish_position"]
-                if pd.isna(fp):
-                    actual_str = "  [actual: DNF]"
-                else:
-                    hit = "✓" if row["predicted_label"] == row[target] else "✗"
-                    actual_str = f"  [actual finish: P{int(fp)} {hit}]"
-            print(
-                f"{label}: {row['driver_id']}  "
-                f"(grid {int(row['grid_position'])}, "
-                f"probability {row['predicted_prob']:.1%}){actual_str}"
-            )
-    else:
-        print(top_rows[display_cols].to_string(index=False))
+    # IMPORTANT: medal labels (P1/P2/P3) only make sense for podium_finish —
+    # they'd be misleading for top10_finish, since "top 3 by top10 probability"
+    # is not a podium prediction. Also note: this is a RANKING by predicted
+    # probability, not a prediction of exact finishing position — the model
+    # never predicts exact race order (see module docstring).
+    use_medals = (target == "podium_finish")
+    podium_labels = ["🥇 P1", "🥈 P2", "🥉 P3"]
+
+    for rank, (_, row) in enumerate(top_rows.iterrows()):
+        if use_medals and rank < 3:
+            label = podium_labels[rank]
+        else:
+            label = f"#{rank + 1}"
+        actual_str = ""
+        if has_actual:
+            fp = row["finish_position"]
+            if pd.isna(fp):
+                actual_str = "  [actual: DNF]"
+            else:
+                hit = "✓" if row["predicted_label"] == row[target] else "✗"
+                actual_str = f"  [actual finish: P{int(fp)} {hit}]"
+        print(
+            f"{label}: {row['driver_id']}  "
+            f"(grid {int(row['grid_position'])}, "
+            f"probability {row['predicted_prob']:.1%}){actual_str}"
+        )
 
     if has_actual:
         scored_rows = scoreable.dropna(subset=["finish_position"])
@@ -194,7 +201,7 @@ def main():
     parser.add_argument("--race-id", type=str, default=None)
     parser.add_argument("--target", choices=["top10_finish", "podium_finish"], default="top10_finish")
     parser.add_argument("--model", choices=["logreg", "xgboost"], default="xgboost")
-    parser.add_argument("--top", type=int, default=3, help="Number of top drivers to display (default: 3)")
+    parser.add_argument("--top", type=int, default=None, help="Number of top drivers to display (default: all)")
     args = parser.parse_args()
 
     tables = load_gold_tables()
