@@ -15,7 +15,6 @@
 - 🐙 [github.com/3mrZain7agag](https://github.com/3mrZain7agag)
 
 ---
-
 ## 🎯 Project Goal
 
 A portfolio-grade, end-to-end Data Engineering platform that demonstrates mastery of the full modern DE stack:
@@ -580,8 +579,9 @@ Two models per target (LogisticRegression with scaling + `class_weight="balanced
 **Honest takeaway:** neither model fully beats the naive grid-position heuristic on raw accuracy — grid position is a genuinely strong predictor in F1, and these features mostly recover that signal rather than dramatically exceeding it, consistent with the missing weather/tire/telemetry data. ROC-AUC (0.81–0.93) is the more informative metric here since ranking quality matters more than a single accuracy threshold. Podium finish was more predictable than top-10 (ROC-AUC 0.93 vs 0.81) — podium contenders form a smaller, more consistent group of fast cars/drivers than "anyone who might sneak into the top 10."
 
 ### Real-world validation
-Ran `predict_latest_podium.sh` against the 2026 British Grand Prix (already-completed, unseen during training):
+Ran `predict_latest_podium.sh` / `predict_race.sh` against two real races the model never saw during training:
 
+**2026 British Grand Prix** (podium prediction):
 ```
 🥇 P1: antonelli  (grid 1, probability 80.8%)  [actual finish: P15 ✗]
 🥈 P2: leclerc    (grid 2, probability 70.9%)  [actual finish: P1  ✓]
@@ -590,7 +590,22 @@ Ran `predict_latest_podium.sh` against the 2026 British Grand Prix (already-comp
 Prediction accuracy across 20 classified drivers: 0.900
 ```
 
-**2 of 3 predicted podium finishers were correct**, and overall classification accuracy across all drivers was 0.900. Antonelli's miss (pole position → P15) is a clean illustration of the model's core limitation: it has no visibility into in-race incidents, penalties, or mechanical failures — it can only reason from pre-race information.
+**2026 Belgian Grand Prix** (podium prediction):
+```
+🥇 P1: russell         (grid 3, probability 86.2%)  [actual: DNF]
+🥈 P2: antonelli       (grid 1, probability 84.3%)  [actual finish: P1 ✓]
+🥉 P3: max_verstappen  (grid 2, probability 75.3%)  [actual finish: P3 ✓]
+
+Prediction accuracy across 19 classified drivers: 0.947
+```
+
+**2026 Belgian Grand Prix** (full-field top10_finish ranking, all 22 drivers by predicted probability):
+```
+Prediction accuracy across 19 classified drivers: 0.842
+```
+Beyond the accuracy number, the probability ranking tracked the actual finishing order remarkably closely across the whole field — e.g. the bottom six predicted (Bearman, Albon, Sainz, Ocon, Bottas, Alonso) finished in almost exactly that order (P14–P19). This wasn't something the model was explicitly trained to do (it only predicts a binary top-10 outcome), but it emerged as a useful side effect of the predicted probabilities.
+
+**Across both races, the pattern repeats:** 2 of 3 predicted podium finishers correct each time, and the one miss both times was a driver who started well but didn't finish (Antonelli → P15 at the British GP; Russell → DNF at Belgium). This is a clean, consistent illustration of the model's core limitation — it has no visibility into in-race incidents, penalties, or mechanical failures, and can only reason from pre-race information. That consistency across two independent races is a stronger validation than either result alone.
 
 ### Project structure (Step 10)
 ```
@@ -621,6 +636,9 @@ ml/
 - **`.all()` vs `.any()` when checking "has this race finished":** a completed race still has `NULL` `finish_position` for any DNF/retired driver — checking `finish_position.notna().all()` would almost never be true for a real race. Switched to `.any()`, and score accuracy only on the classified (non-DNF) subset.
 - **`mlflow.sklearn.log_model` can't safely serialize XGBoost's booster** — raises a `skops` untrusted-types error. Use `mlflow.xgboost.log_model` for XGBoost models instead.
 - **Reproducibility needs explicit `random_state`:** without it, `LogisticRegression` and `XGBClassifier` gave slightly different metrics on every identical re-run — fixed by pinning `random_state=42` on both.
+- **Incremental Bronze uploads can silently mask updated data:** `step04.sh`'s default incremental upload skips files that already exist in Bronze — including when their *content* has changed (e.g. a race that previously had only qualifying data later gains results). This meant a full `step01→09` re-run showed no new results even after they appeared in the API. Fixed by having `refresh_pipeline.sh` force-upload Bronze (`ingest_to_bronze(force=True)`) instead of relying on the incremental default.
+- **Prediction script correctness display must match what the model actually predicts:** the initial ✓/✗ display could look like it was judging exact-rank accuracy (e.g. "predicted #6, actual P2 ✓" reads oddly at a glance). Since the model only predicts a binary top-10/podium outcome — never an exact finishing position — the display was reworded to show `predicted: YES/NO, actual: YES/NO (finished PN)` explicitly, so the judgment is unambiguous and doesn't imply a capability the model doesn't have.
+- **Medal-style (🥇🥈🥉) formatting should be reserved for the podium target:** originally it appeared whenever only 3 rows were displayed, which misleadingly dressed up "top 3 most likely to finish top 10" as if it were a podium prediction. Fixed by scoping medal labels to `--target podium_finish` only, with `top10_finish` (or any target) using a plain `#1, #2, #3...` ranking instead.
 
 ---
 
