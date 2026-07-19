@@ -42,7 +42,7 @@ A portfolio-grade, end-to-end Data Engineering platform that demonstrates master
 | 07 | Data Quality | ✅ Complete | Great Expectations |
 | 08 | Kafka Streaming | ✅ Complete | Apache Kafka, Spark Structured Streaming |
 | 09 | Power BI Dashboard | ✅ Complete | Power BI |
-| 10 | Machine Learning | 🔲 Upcoming | scikit-learn, MLflow, XGBoost |
+| 10 | Machine Learning | ✅ Complete | scikit-learn, MLflow, XGBoost |
 
 ---
 
@@ -79,6 +79,14 @@ bash scripts/step07.sh   # Validate Silver data quality (Great Expectations)
 bash scripts/step06.sh   # Transform Silver → Gold (dbt)
 bash scripts/step08.sh   # Kafka race replay + Spark Streaming consumer
 bash scripts/step09.sh   # Export Gold layer to CSV for Power BI
+bash scripts/step10.sh   # ML: build features + train podium/top10 models
+```
+
+### After Pulling New Data
+```bash
+bash scripts/step01.sh 2026          # pull new season/round data
+bash scripts/refresh_pipeline.sh     # push it through Bronze→Silver→Quality→Gold→Export
+bash scripts/step10.sh               # rebuild ML features + retrain (if using Step 10)
 ```
 
 ### Save Your Work to GitHub
@@ -131,6 +139,10 @@ bash scripts/git_save.sh "your message here"
 | `step07.sh` | `bash scripts/step07.sh` | Validate Silver data quality (Great Expectations) |
 | `step08.sh` | `bash scripts/step08.sh [season] [round]` | Kafka race replay + Spark Streaming consumer |
 | `step09.sh` | `bash scripts/step09.sh` | Export Gold layer tables to CSV (`exports/gold/`) for Power BI |
+| `step10.sh` | `bash scripts/step10.sh` | ML: creates `.venv-ml` (first run), builds features, trains top10_finish + podium_finish models |
+| `predict_race.sh` | `bash scripts/predict_race.sh [--race-id ID] [--target ...] [--model ...] [--top N]` | Predict any race by ID, target, model, and result count |
+| `predict_latest_podium.sh` | `bash scripts/predict_latest_podium.sh` | Predict podium (top 3) for the newest race with qualifying data; compares to actual if the race has happened |
+| `refresh_pipeline.sh` | `bash scripts/refresh_pipeline.sh` | Push newly-pulled data (from `step01.sh`) through Bronze→Silver→Quality→Gold→Export in the correct order |
 
 ### 📅 Daily Workflow
 ```
@@ -530,6 +542,85 @@ Dashboard icons sourced from [Flaticon](https://www.flaticon.com/). One icon set
 
 ---
 
+## ✅ Step 10 — Machine Learning
+
+### What it does
+Trains binary classifiers to predict whether a driver finishes **top 10** (`top10_finish`) or **on the podium** (`podium_finish`) in a race, using only information available right after qualifying — grid position, qualifying position, and each driver/constructor's form up to that point in the season. Also includes a prediction script that can target any race, including one that hasn't been run yet.
+
+**Important framing:** this predicts a per-driver yes/no probability, not the full finishing order of the race. It requires qualifying to have happened (grid/qualifying position must exist), so it can't forecast anything before that. It's evaluated on genuinely unseen data — trained on all-but-the-latest season, tested on the latest season — to simulate real forecasting rather than just fitting historical data.
+
+### Choosing the target
+With this project's feature set (Jolpica/Ergast data only — no weather, tire, or telemetry data, since FastF1 was dropped in Step 04), the strongest available signal is grid position, qualifying position, and season-to-date form. Of the plausible targets (finishing position regression, DNF probability, top-10, podium), **top10_finish** and **podium_finish** were chosen as binary classifiers: they have enough positive examples to train reliably, and they map to a clean, explainable story. DNF prediction was skipped — reliability is driven mostly by mechanical/weather factors this dataset doesn't capture — and exact-position regression was skipped since grid position alone would dominate the model without much else to show.
+
+### Features (leakage-safe)
+| Feature | Source | Note |
+|---------|--------|------|
+| `grid_position`, `qualifying_position` | `fact_race_results` | Falls back to qualifying position if grid isn't confirmed yet (pre-penalty) |
+| `grid_penalty_positions` | derived | `grid_position - qualifying_position`; captures grid drops/promotions penalties mask |
+| `driver_prior_season_points/wins` | `agg_driver_season_stats`, shifted +1 year | Uses the **previous** season only — using the current season would leak the outcome into the feature |
+| `constructor_prior_season_points/dnf_rate` | `agg_constructor_season_stats`, shifted +1 year | Same leakage-safe shift |
+| `circuit_avg_lap_time_ms`, `circuit_races_held` | `agg_circuit_stats` | All-time aggregate (simplification — ideally "history up to this race") |
+| `driver_points_this_season_so_far` | rolling, shifted | Cumulative points **before** this race, within the season |
+| `driver_avg_finish_last_3` | rolling, shifted | Recent in-season form — closed a real ~5-point accuracy gap to baseline when added |
+| `is_rookie_or_new_team` | derived flag | Flags drivers/constructors with no prior-season data (~27% of rows) |
+
+### Models & results
+Two models per target (LogisticRegression with scaling + `class_weight="balanced"`, and XGBoost), tracked in MLflow, trained on all-but-latest season and tested on the latest season, compared against a naive "grid position ≤ N" baseline:
+
+| Target | Model | Accuracy | Precision | Recall | ROC-AUC | Baseline |
+|--------|-------|----------|-----------|--------|---------|----------|
+| top10_finish | LogisticRegression | 0.747 | 0.857 | 0.674 | 0.835 | 0.773 |
+| top10_finish | XGBoost | 0.766 | 0.853 | 0.719 | 0.813 | 0.773 |
+| podium_finish | LogisticRegression | 0.838 | 0.520 | 0.963 | 0.920 | 0.883 |
+| podium_finish | XGBoost | 0.870 | 0.640 | 0.593 | 0.934 | 0.883 |
+
+**Honest takeaway:** neither model fully beats the naive grid-position heuristic on raw accuracy — grid position is a genuinely strong predictor in F1, and these features mostly recover that signal rather than dramatically exceeding it, consistent with the missing weather/tire/telemetry data. ROC-AUC (0.81–0.93) is the more informative metric here since ranking quality matters more than a single accuracy threshold. Podium finish was more predictable than top-10 (ROC-AUC 0.93 vs 0.81) — podium contenders form a smaller, more consistent group of fast cars/drivers than "anyone who might sneak into the top 10."
+
+### Real-world validation
+Ran `predict_latest_podium.sh` against the 2026 British Grand Prix (already-completed, unseen during training):
+
+```
+🥇 P1: antonelli  (grid 1, probability 80.8%)  [actual finish: P15 ✗]
+🥈 P2: leclerc    (grid 2, probability 70.9%)  [actual finish: P1  ✓]
+🥉 P3: hamilton   (grid 3, probability 53.2%)  [actual finish: P3  ✓]
+
+Prediction accuracy across 20 classified drivers: 0.900
+```
+
+**2 of 3 predicted podium finishers were correct**, and overall classification accuracy across all drivers was 0.900. Antonelli's miss (pole position → P15) is a clean illustration of the model's core limitation: it has no visibility into in-race incidents, penalties, or mechanical failures — it can only reason from pre-race information.
+
+### Project structure (Step 10)
+```
+ml/
+├── features/build_features.py      ← Gold CSVs → leakage-safe training dataset
+├── train/train_model.py             ← trains + logs to MLflow + saves .joblib
+├── predict/
+│   ├── predict_race.py              ← predict any race by ID/target/model/top-N
+│   └── predict_latest_podium.py     ← always predicts podium for the newest race with qualifying
+├── models/                          ← saved .joblib models (gitignored)
+├── data/                            ← generated training_dataset.csv (gitignored)
+└── requirements-ml.txt              ← pinned deps for the isolated .venv-ml
+```
+
+### Key features
+- ✅ Two targets (top10_finish, podium_finish), two models each, MLflow-tracked, reproducible (`random_state=42`)
+- ✅ Season-based train/test split (not random shuffle) to avoid leakage and mirror real forecasting
+- ✅ Prediction script works on historical races (compares to actual) and genuinely future races (predictions only)
+- ✅ Falls back to qualifying position when grid position isn't confirmed yet (pre-penalty)
+- ✅ Isolated `.venv-ml` environment — see lessons learned below
+- ✅ Friendly error messages if scripts are run outside the ML venv, instead of raw `ModuleNotFoundError` tracebacks
+
+### Lessons learned
+- **`mlflow` vs `dbt-core` protobuf conflict:** `mlflow` requires `protobuf<7`, while `dbt-core`/`dbt-adapters` require `protobuf>=6.0`, and `opentelemetry-proto` (a transitive mlflow dependency) requires `protobuf<5.0` — an unresolvable three-way version conflict in one environment. Fixed by isolating all ML work in its own `.venv-ml`, with its own `ml/requirements-ml.txt`, completely separate from the environment dbt/Airflow use.
+- **Jolpica API caching quirk:** explicitly requesting `limit=1000` on single-race endpoints (`results`, `qualifying`, `pitstops` — which never have more than ~24 rows) intermittently returned a stale, empty cached response, even though the same URL without a `limit` param returned correct data. Fixed by dropping the `limit` param entirely on those three endpoints, since they never need pagination anyway.
+- **`FULL OUTER JOIN` vs `LEFT JOIN` in `fact_race_results.sql`:** Jolpica's `results.json` has no data at all for a race until it's actually run, but `qualifying.json` populates as soon as qualifying finishes — often a day or more earlier. The original model started `FROM stg_results` with a `LEFT JOIN` to qualifying, which meant a race with qualifying-only data produced **zero rows**, breaking any workflow (like live race prediction) that needs pre-race qualifying data. Fixed with a `FULL OUTER JOIN` + `COALESCE`, so a row exists from qualifying alone when results aren't in yet.
+- **dbt tests need to account for legitimately-nullable future data:** the above join fix meant `points` could now be `NULL` for not-yet-run races — correctly so. Rather than removing the `not_null` test, it was scoped with dbt's `where` config (`where: "finish_position is not null"`) to apply only to completed races.
+- **`.all()` vs `.any()` when checking "has this race finished":** a completed race still has `NULL` `finish_position` for any DNF/retired driver — checking `finish_position.notna().all()` would almost never be true for a real race. Switched to `.any()`, and score accuracy only on the classified (non-DNF) subset.
+- **`mlflow.sklearn.log_model` can't safely serialize XGBoost's booster** — raises a `skops` untrusted-types error. Use `mlflow.xgboost.log_model` for XGBoost models instead.
+- **Reproducibility needs explicit `random_state`:** without it, `LogisticRegression` and `XGBClassifier` gave slightly different metrics on every identical re-run — fixed by pinning `random_state=42` on both.
+
+---
+
 ## 🗂️ Project Structure
 
 ```
@@ -572,6 +663,15 @@ f1-data-engineering/
 │   └── export_gold_to_csv.py     ← Gold layer → CSV, for Power BI
 ├── exports/
 │   └── gold/                     ← CSV output from export_gold_to_csv.py (9 Gold tables)
+├── ml/
+│   ├── features/build_features.py    ← Gold CSVs → leakage-safe training dataset
+│   ├── train/train_model.py           ← trains + logs to MLflow + saves .joblib
+│   ├── predict/
+│   │   ├── predict_race.py            ← predict any race by ID/target/model
+│   │   └── predict_latest_podium.py   ← predicts podium for the newest race
+│   ├── models/                        ← saved .joblib models (gitignored)
+│   ├── data/                          ← generated training data (gitignored)
+│   └── requirements-ml.txt            ← pinned deps for .venv-ml
 ├── infra/
 │   ├── environments/dev/main.tf  ← Terraform env config (AWS infra currently torn down)
 │   └── modules/
@@ -611,6 +711,10 @@ f1-data-engineering/
 │   ├── step07.sh
 │   ├── step08.sh
 │   ├── step09.sh
+│   ├── step10.sh
+│   ├── predict_race.sh
+│   ├── predict_latest_podium.sh
+│   ├── refresh_pipeline.sh
 │   ├── steps.sh                  ← Steps reference dictionary
 │   ├── view_gold.sh
 │   └── git_save.sh
@@ -648,6 +752,9 @@ f1-data-engineering/
 | Apache Airflow | 2.9.3 | Pipeline orchestration |
 | Docker Compose | 2.40 | Local service management |
 | Terraform | Latest | AWS infra as code (currently torn down; modules retained for reference) |
+| scikit-learn | 1.9.0 | ML baseline models (isolated in `.venv-ml`) |
+| XGBoost | 3.3.0 | ML gradient-boosted models (isolated in `.venv-ml`) |
+| MLflow | 3.14.0 | ML experiment tracking (isolated in `.venv-ml`) |
 | Power BI Desktop | Latest | Dashboarding and analytics |
 
 ---
